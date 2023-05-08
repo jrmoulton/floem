@@ -485,7 +485,7 @@ pub struct InteractionState {
 }
 
 pub struct LayoutCx<'a> {
-    pub(crate) app_state: &'a mut AppState,
+    pub app_state: &'a mut AppState,
     pub(crate) viewport: Option<Rect>,
     pub(crate) font_size: Option<f32>,
     pub(crate) font_family: Option<String>,
@@ -609,7 +609,7 @@ impl<'a> LayoutCx<'a> {
 }
 
 pub struct PaintCx<'a> {
-    pub(crate) app_state: &'a mut AppState,
+    pub app_state: &'a mut AppState,
     pub(crate) paint_state: &'a mut PaintState,
     pub(crate) transform: Affine,
     pub(crate) clip: Option<Rect>,
