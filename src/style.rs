@@ -209,6 +209,10 @@ macro_rules! define_styles {
 define_styles!(
     display: Display = Display::Flex,
     position: Position = Position::Relative,
+    left: LengthPercentageAuto = LengthPercentageAuto::ZERO,
+    top: LengthPercentageAuto = LengthPercentageAuto::ZERO,
+    right: LengthPercentageAuto = LengthPercentageAuto::ZERO,
+    bottom: LengthPercentageAuto = LengthPercentageAuto::ZERO,
     width: Dimension = Dimension::Auto,
     height: Dimension = Dimension::Auto,
     min_width: Dimension = Dimension::Auto,
@@ -549,6 +553,38 @@ impl Style {
         self.position(Position::Absolute)
     }
 
+    pub fn left_px(self, left: f32) -> Self {
+        self.top(LengthPercentageAuto::Points(left))
+    }
+
+    pub fn top_px(self, top: f32) -> Self {
+        self.top(LengthPercentageAuto::Points(top))
+    }
+
+    pub fn right_px(self, right: f32) -> Self {
+        self.right(LengthPercentageAuto::Points(right))
+    }
+
+    pub fn bottom_px(self, bottom: f32) -> Self {
+        self.bottom(LengthPercentageAuto::Points(bottom))
+    }
+
+    pub fn left_pct(self, left: f32) -> Self {
+        self.top(LengthPercentageAuto::Percent(left))
+    }
+
+    pub fn top_pct(self, top: f32) -> Self {
+        self.top(LengthPercentageAuto::Percent(top))
+    }
+
+    pub fn right_pct(self, right: f32) -> Self {
+        self.right(LengthPercentageAuto::Percent(right))
+    }
+
+    pub fn bottom_pct(self, bottom: f32) -> Self {
+        self.bottom(LengthPercentageAuto::Percent(bottom))
+    }
+
     pub fn items_start(self) -> Self {
         self.align_items(Some(AlignItems::FlexStart))
     }
@@ -621,6 +657,12 @@ impl ComputedStyle {
         TaffyStyle {
             display: self.display,
             position: self.position,
+            inset: Rect {
+                left: self.left,
+                right: self.right,
+                top: self.top,
+                bottom: self.bottom,
+            },
             size: taffy::prelude::Size {
                 width: self.width,
                 height: self.height,

@@ -63,9 +63,7 @@ impl Application {
     /// create a new window for the application, if you want multiple windows,
     /// just chain more window method to the builder
     pub fn window<V: View + 'static>(
-        self,
-        app_view: impl FnOnce(AppContext) -> V + 'static,
-        config: Option<WindowConfig>,
+        self, app_view: impl FnOnce(AppContext) -> V + 'static, config: Option<WindowConfig>,
     ) -> Self {
         let application = self.application.clone();
         let _ = self.scope.child_scope(move |cx| {
