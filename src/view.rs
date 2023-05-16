@@ -152,6 +152,7 @@ pub trait View {
 
     fn compute_layout(&mut self, cx: &mut LayoutCx);
 
+    // TODO! Move the title bar check code to this place directly
     fn event_main(&mut self, cx: &mut EventCx, id_path: Option<&[Id]>, event: Event) -> bool {
         let id = self.id();
         if cx.app_state.is_hidden(id) {
