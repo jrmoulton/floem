@@ -609,6 +609,7 @@ impl<V: View> WinHandler for AppHandle<V> {
 
     fn pointer_up(&mut self, event: &glazier::PointerEvent) {
         self.prev_mouse_pos = MousePosState::None;
+        self.handle.handle_titlebar(false);
         self.event(Event::PointerUp(event.clone()));
     }
 
