@@ -29,11 +29,11 @@ impl Default for Application {
 impl glazier::AppHandler for Application {
     fn command(&mut self, _id: u32) {}
 
-    fn will_terminate(&mut self) {
-        if let Some(action) = self.event_listner.as_ref() {
-            action(&AppEvent::WillTerminate);
-        }
-    }
+    // fn will_terminate(&mut self) {
+    //     if let Some(action) = self.event_listner.as_ref() {
+    //         action(&AppEvent::WillTerminate);
+    //     }
+    // }
 }
 
 impl Application {
