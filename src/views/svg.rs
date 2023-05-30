@@ -93,7 +93,7 @@ impl View for Svg {
         }
     }
 
-    fn layout(&mut self, cx: &mut crate::context::LayoutCx) -> taffy::prelude::Node {
+    fn layout(&mut self, cx: &mut crate::context::LayoutCx) -> taffy::prelude::NodeId {
         cx.layout_node(self.id, false, |_| Vec::new())
     }
 

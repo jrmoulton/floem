@@ -13,8 +13,9 @@ use glazier::{
     PointerEvent, Scale,
 };
 use taffy::{
-    prelude::{Layout, Node},
+    prelude::Layout,
     style::{AvailableSpace, Display},
+    tree::NodeId,
 };
 use vello::peniko::Color;
 
@@ -64,8 +65,8 @@ pub(crate) struct ResizeListener {
 }
 
 pub struct ViewState {
-    pub(crate) node: Node,
-    pub(crate) children_nodes: Vec<Node>,
+    pub(crate) node: NodeId,
+    pub(crate) children_nodes: Vec<NodeId>,
     pub(crate) request_layout: bool,
     pub(crate) viewport: Option<Rect>,
     pub(crate) layout_rect: Rect,
@@ -225,7 +226,7 @@ pub struct AppState {
     /// when a view is active, it gets mouse event even when the mouse is
     /// not on it
     pub(crate) active: Option<Id>,
-    pub(crate) root: Option<Node>,
+    pub(crate) root: Option<NodeId>,
     pub(crate) root_size: Size,
     pub(crate) scale: f64,
     pub taffy: taffy::Taffy,
@@ -692,15 +693,15 @@ impl<'a> LayoutCx<'a> {
         self.app_state.get_computed_style(id)
     }
 
-    pub fn set_style(&mut self, node: Node, style: taffy::style::Style) {
+    pub fn set_style(&mut self, node: NodeId, style: taffy::style::Style) {
         let _ = self.app_state.taffy.set_style(node, style);
     }
 
-    pub fn layout(&self, node: Node) -> Option<Layout> {
+    pub fn layout(&self, node: NodeId) -> Option<Layout> {
         self.app_state.taffy.layout(node).ok().copied()
     }
 
-    pub fn new_node(&mut self) -> Node {
+    pub fn new_node(&mut self) -> NodeId {
         self.app_state
             .taffy
             .new_leaf(taffy::style::Style::DEFAULT)
@@ -711,8 +712,8 @@ impl<'a> LayoutCx<'a> {
         &mut self,
         id: Id,
         has_children: bool,
-        mut children: impl FnMut(&mut LayoutCx) -> Vec<Node>,
-    ) -> Node {
+        mut children: impl FnMut(&mut LayoutCx) -> Vec<NodeId>,
+    ) -> NodeId {
         let view = self.app_state.view_state(id);
         let node = view.node;
         if !view.request_layout {
@@ -812,7 +813,7 @@ impl<'a> PaintCx<'a> {
         self.font_family.as_deref()
     }
 
-    pub fn layout(&self, node: Node) -> Option<Layout> {
+    pub fn layout(&self, node: NodeId) -> Option<Layout> {
         self.app_state.taffy.layout(node).ok().copied()
     }
 

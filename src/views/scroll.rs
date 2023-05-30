@@ -5,7 +5,7 @@ use glazier::{
 };
 use leptos_reactive::create_effect;
 use taffy::{
-    prelude::Node,
+    prelude::NodeId,
     style::{Dimension, Position},
 };
 use vello::peniko::Color;
@@ -55,7 +55,7 @@ pub struct Scroll<V: View> {
     child_viewport: Rect,
     onscroll: Option<Box<dyn Fn(Rect)>>,
     held: BarHeldState,
-    virtual_node: Option<Node>,
+    virtual_node: Option<NodeId>,
     hide_bar: bool,
     scroll_bar_color: Color,
 }
@@ -223,19 +223,19 @@ impl<V: View> Scroll<V> {
 
         let style = app_state.get_computed_style(self.id);
         let padding_left = match style.padding_left {
-            taffy::style::LengthPercentage::Points(padding) => padding,
+            taffy::style::LengthPercentage::Length(padding) => padding,
             taffy::style::LengthPercentage::Percent(pct) => pct * layout.size.width,
         };
         let padding_right = match style.padding_right {
-            taffy::style::LengthPercentage::Points(padding) => padding,
+            taffy::style::LengthPercentage::Length(padding) => padding,
             taffy::style::LengthPercentage::Percent(pct) => pct * layout.size.width,
         };
         let padding_top = match style.padding_top {
-            taffy::style::LengthPercentage::Points(padding) => padding,
+            taffy::style::LengthPercentage::Length(padding) => padding,
             taffy::style::LengthPercentage::Percent(pct) => pct * layout.size.width,
         };
         let padding_bottom = match style.padding_bottom {
-            taffy::style::LengthPercentage::Points(padding) => padding,
+            taffy::style::LengthPercentage::Length(padding) => padding,
             taffy::style::LengthPercentage::Percent(pct) => pct * layout.size.width,
         };
         let mut actual_rect = self.size.to_rect();
@@ -477,7 +477,7 @@ impl<V: View> View for Scroll<V> {
         }
     }
 
-    fn layout(&mut self, cx: &mut crate::context::LayoutCx) -> taffy::prelude::Node {
+    fn layout(&mut self, cx: &mut crate::context::LayoutCx) -> taffy::prelude::NodeId {
         cx.layout_node(self.id, true, |cx| {
             let child_id = self.child.id();
             let mut child_view = cx.app_state.view_state(child_id);
@@ -485,10 +485,10 @@ impl<V: View> View for Scroll<V> {
             let child_node = self.child.layout_main(cx);
 
             let virtual_style = Style::BASE
-                .width(Dimension::Points(self.child_size.width as f32))
-                .height(Dimension::Points(self.child_size.height as f32))
-                .min_width(Dimension::Points(0.0))
-                .min_height(Dimension::Points(0.0))
+                .width(Dimension::Length(self.child_size.width as f32))
+                .height(Dimension::Length(self.child_size.height as f32))
+                .min_width(Dimension::Length(0.0))
+                .min_height(Dimension::Length(0.0))
                 .compute(&ComputedStyle::default())
                 .to_taffy_style();
             if self.virtual_node.is_none() {

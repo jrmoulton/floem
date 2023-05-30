@@ -134,7 +134,7 @@ where
         }
     }
 
-    fn layout(&mut self, cx: &mut crate::context::LayoutCx) -> taffy::prelude::Node {
+    fn layout(&mut self, cx: &mut crate::context::LayoutCx) -> taffy::prelude::NodeId {
         cx.layout_node(self.id, true, |cx| {
             let nodes = self
                 .children
