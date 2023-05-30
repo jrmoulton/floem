@@ -5,7 +5,7 @@ use leptos_reactive::{
     create_effect, create_signal, ScopeDisposer, SignalGet, SignalSet, WriteSignal,
 };
 use smallvec::SmallVec;
-use taffy::{prelude::Node, style::Dimension};
+use taffy::{prelude::NodeId, style::Dimension};
 
 use crate::{
     app_handle::AppContext,
@@ -58,8 +58,8 @@ where
     cx: AppContext,
     before_size: f64,
     after_size: f64,
-    before_node: Option<Node>,
-    after_node: Option<Node>,
+    before_node: Option<NodeId>,
+    after_node: Option<NodeId>,
 }
 
 struct VirtualListState<T> {
@@ -260,7 +260,7 @@ where
         }
     }
 
-    fn layout(&mut self, cx: &mut crate::context::LayoutCx) -> taffy::prelude::Node {
+    fn layout(&mut self, cx: &mut crate::context::LayoutCx) -> taffy::prelude::NodeId {
         cx.layout_node(self.id, true, |cx| {
             let mut nodes = self
                 .children
@@ -270,20 +270,20 @@ where
             let before_size = match self.direction {
                 VirtualListDirection::Vertical => taffy::prelude::Size {
                     width: Dimension::Percent(1.0),
-                    height: Dimension::Points(self.before_size as f32),
+                    height: Dimension::Length(self.before_size as f32),
                 },
                 VirtualListDirection::Horizontal => taffy::prelude::Size {
-                    width: Dimension::Points(self.before_size as f32),
+                    width: Dimension::Length(self.before_size as f32),
                     height: Dimension::Percent(1.0),
                 },
             };
             let after_size = match self.direction {
                 VirtualListDirection::Vertical => taffy::prelude::Size {
                     width: Dimension::Percent(1.0),
-                    height: Dimension::Points(self.after_size as f32),
+                    height: Dimension::Length(self.after_size as f32),
                 },
                 VirtualListDirection::Horizontal => taffy::prelude::Size {
-                    width: Dimension::Points(self.after_size as f32),
+                    width: Dimension::Length(self.after_size as f32),
                     height: Dimension::Percent(1.0),
                 },
             };

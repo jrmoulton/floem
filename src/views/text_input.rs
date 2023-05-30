@@ -2,10 +2,7 @@ use crate::{context::LayoutCx, style::CursorStyle};
 use leptos_reactive::{
     create_effect, RwSignal, SignalGet, SignalGetUntracked, SignalUpdate, SignalWith,
 };
-use taffy::{
-    prelude::{Layout, Node},
-    style::Dimension,
-};
+use taffy::{prelude::Layout, style::Dimension, tree::NodeId};
 
 use floem_renderer::{
     cosmic_text::{Cursor, Style as FontStyle, Weight},
@@ -55,7 +52,7 @@ pub struct TextInput {
     // This can be retrieved from the glyph, but we store it for efficiency
     cursor_x: f64,
     text_buf: Option<TextLayout>,
-    text_node: Option<Node>,
+    text_node: Option<NodeId>,
     // Shown when the width exceeds node width for single line input
     clipped_text: Option<String>,
     // Glyph index from which we started clipping
@@ -537,11 +534,11 @@ impl View for TextInput {
                     let style = cx.app_state.get_computed_style(self.id);
 
                     let padding_left = match style.padding_left {
-                        taffy::style::LengthPercentage::Points(padding) => padding,
+                        taffy::style::LengthPercentage::Length(padding) => padding,
                         taffy::style::LengthPercentage::Percent(pct) => pct * layout.size.width,
                     };
                     let padding_top = match style.padding_top {
-                        taffy::style::LengthPercentage::Points(padding) => padding,
+                        taffy::style::LengthPercentage::Length(padding) => padding,
                         taffy::style::LengthPercentage::Percent(pct) => pct * layout.size.height,
                     };
                     self.cursor_glyph_idx = self
@@ -577,7 +574,7 @@ impl View for TextInput {
         false
     }
 
-    fn layout(&mut self, cx: &mut crate::context::LayoutCx) -> taffy::prelude::Node {
+    fn layout(&mut self, cx: &mut crate::context::LayoutCx) -> taffy::prelude::NodeId {
         cx.layout_node(self.id, true, |cx| {
             self.is_focused = cx.app_state.is_focused(&self.id);
             if self.text_layout_changed(cx) {
@@ -601,8 +598,8 @@ impl View for TextInput {
             let text_node = self.text_node.unwrap();
 
             let style = Style::BASE
-                .width(Dimension::Points(self.width))
-                .height(Dimension::Points(self.height))
+                .width(Dimension::Length(self.width))
+                .height(Dimension::Length(self.height))
                 .compute(&ComputedStyle::default())
                 .to_taffy_style();
             let _ = cx.app_state.taffy.set_style(text_node, style);

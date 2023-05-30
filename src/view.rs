@@ -3,7 +3,7 @@ use std::any::Any;
 use bitflags::bitflags;
 use floem_renderer::Renderer;
 use glazier::kurbo::{Affine, Circle, Line, Point, Rect, Size};
-use taffy::prelude::Node;
+use taffy::prelude::NodeId;
 
 use crate::{
     context::{DragState, EventCx, LayoutCx, PaintCx, UpdateCx},
@@ -58,7 +58,7 @@ pub trait View {
 
     fn update(&mut self, cx: &mut UpdateCx, state: Box<dyn Any>) -> ChangeFlags;
 
-    fn layout_main(&mut self, cx: &mut LayoutCx) -> Node {
+    fn layout_main(&mut self, cx: &mut LayoutCx) -> NodeId {
         cx.save();
 
         let view_style = self.view_style();
@@ -90,7 +90,7 @@ pub trait View {
         node
     }
 
-    fn layout(&mut self, cx: &mut LayoutCx) -> Node;
+    fn layout(&mut self, cx: &mut LayoutCx) -> NodeId;
 
     fn compute_layout_main(&mut self, cx: &mut LayoutCx) -> Rect {
         if cx.app_state.is_hidden(self.id()) {
@@ -102,7 +102,7 @@ pub trait View {
         let layout = cx
             .app_state
             .get_layout(self.id())
-            .unwrap_or(taffy::layout::Layout::new());
+            .unwrap_or(taffy::tree::Layout::new());
         let origin = Point::new(layout.location.x as f64, layout.location.y as f64);
         let parent_viewport = cx.viewport.map(|rect| {
             rect.with_origin(Point::new(

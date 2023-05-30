@@ -10,7 +10,7 @@ use floem_renderer::{
 };
 use glazier::kurbo::{Point, Rect};
 use leptos_reactive::create_effect;
-use taffy::{prelude::Node, style::Dimension};
+use taffy::{prelude::NodeId, style::Dimension};
 use vello::peniko::Color;
 
 use crate::{
@@ -26,7 +26,7 @@ pub struct Label {
     id: Id,
     label: String,
     text_layout: Option<TextLayout>,
-    text_node: Option<Node>,
+    text_node: Option<NodeId>,
     available_text: Option<String>,
     available_width: Option<f32>,
     available_text_layout: Option<TextLayout>,
@@ -150,7 +150,7 @@ impl View for Label {
         false
     }
 
-    fn layout(&mut self, cx: &mut crate::context::LayoutCx) -> taffy::prelude::Node {
+    fn layout(&mut self, cx: &mut crate::context::LayoutCx) -> taffy::prelude::NodeId {
         cx.layout_node(self.id, true, |cx| {
             let (width, height) = if self.label.is_empty() {
                 (0.0, cx.current_font_size().unwrap_or(14.0))
@@ -201,8 +201,8 @@ impl View for Label {
             let text_node = self.text_node.unwrap();
 
             let style = Style::BASE
-                .width(Dimension::Points(width))
-                .height(Dimension::Points(height))
+                .width(Dimension::Length(width))
+                .height(Dimension::Length(height))
                 .compute(&ComputedStyle::default())
                 .to_taffy_style();
             let _ = cx.app_state.taffy.set_style(text_node, style);
@@ -220,11 +220,11 @@ impl View for Label {
         let style = cx.app_state.get_computed_style(self.id);
         let text_overflow = style.text_overflow;
         let padding_left = match style.padding_left {
-            taffy::style::LengthPercentage::Points(padding) => padding,
+            taffy::style::LengthPercentage::Length(padding) => padding,
             taffy::style::LengthPercentage::Percent(pct) => pct * layout.size.width,
         };
         let padding_right = match style.padding_right {
-            taffy::style::LengthPercentage::Points(padding) => padding,
+            taffy::style::LengthPercentage::Length(padding) => padding,
             taffy::style::LengthPercentage::Percent(pct) => pct * layout.size.width,
         };
         let padding = padding_left + padding_right;

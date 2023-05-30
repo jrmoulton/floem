@@ -3,7 +3,7 @@ use std::any::Any;
 use floem_renderer::{cosmic_text::TextLayout, Renderer};
 use glazier::kurbo::{Point, Rect};
 use leptos_reactive::create_effect;
-use taffy::{prelude::Node, style::Dimension};
+use taffy::{prelude::NodeId, style::Dimension};
 
 use crate::{
     app_handle::AppContext,
@@ -17,7 +17,7 @@ use crate::{
 pub struct RichText {
     id: Id,
     text_layout: TextLayout,
-    text_node: Option<Node>,
+    text_node: Option<NodeId>,
 }
 
 pub fn rich_text(text_layout: impl Fn() -> TextLayout + 'static) -> RichText {
@@ -74,7 +74,7 @@ impl View for RichText {
         false
     }
 
-    fn layout(&mut self, cx: &mut crate::context::LayoutCx) -> taffy::prelude::Node {
+    fn layout(&mut self, cx: &mut crate::context::LayoutCx) -> taffy::prelude::NodeId {
         cx.layout_node(self.id, true, |cx| {
             let size = self.text_layout.size();
             let width = size.width as f32;
@@ -91,8 +91,8 @@ impl View for RichText {
             let text_node = self.text_node.unwrap();
 
             let style = Style::BASE
-                .width(Dimension::Points(width))
-                .height(Dimension::Points(height))
+                .width(Dimension::Length(width))
+                .height(Dimension::Length(height))
                 .compute(&ComputedStyle::default())
                 .to_taffy_style();
             let _ = cx.app_state.taffy.set_style(text_node, style);
