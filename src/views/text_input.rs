@@ -1,38 +1,38 @@
-use crate::{context::LayoutCx, style::CursorStyle};
-use leptos_reactive::{
-    create_effect, RwSignal, SignalGet, SignalGetUntracked, SignalUpdate, SignalWith,
-};
-use taffy::{prelude::Layout, style::Dimension, tree::NodeId};
-
-use floem_renderer::{
-    cosmic_text::{Cursor, Style as FontStyle, Weight},
-    Renderer,
-};
-use unicode_segmentation::UnicodeSegmentation;
-
-use crate::{peniko::Color, style::Style, view::View, AppContext};
-
 use std::{
     any::Any,
     ops::Range,
     time::{Duration, Instant},
 };
 
-use crate::{
-    cosmic_text::{Attrs, AttrsList, FamilyOwned, TextLayout},
-    style::ComputedStyle,
+use floem_renderer::{
+    cosmic_text::{Cursor, Style as FontStyle, Weight},
+    Renderer,
 };
 use glazier::{
     keyboard_types::Key,
     kurbo::{Point, Rect},
     Modifiers,
 };
+use leptos_reactive::{
+    create_effect,
+    RwSignal,
+    SignalGet,
+    SignalGetUntracked,
+    SignalUpdate,
+    SignalWith,
+};
+use taffy::{prelude::Layout, style::Dimension, tree::NodeId};
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
-    context::{EventCx, UpdateCx},
+    context::{EventCx, LayoutCx, UpdateCx},
+    cosmic_text::{Attrs, AttrsList, FamilyOwned, TextLayout},
     event::Event,
     id::Id,
-    view::ChangeFlags,
+    peniko::Color,
+    style::{ComputedStyle, CursorStyle, Style},
+    view::{ChangeFlags, View},
+    AppContext,
 };
 
 enum InputKind {
@@ -60,9 +60,10 @@ pub struct TextInput {
     // This can be retrieved from the clip start glyph, but we store it for efficiency
     clip_start_x: f64,
     clip_txt_buf: Option<TextLayout>,
-    // When the visible range changes, we also may need to have a small offset depending on the direction we moved.
-    // This makes sure character under the cursor is always fully visible and correctly aligned,
-    // and may cause the last character in the opposite direction to be "cut"
+    // When the visible range changes, we also may need to have a small offset depending on the
+    // direction we moved. This makes sure character under the cursor is always fully visible
+    // and correctly aligned, and may cause the last character in the opposite direction to be
+    // "cut"
     clip_offset_x: f64,
     color: Option<Color>,
     selection: Range<usize>,
@@ -148,28 +149,28 @@ impl TextInput {
                     return true;
                 }
                 false
-            }
+            },
             (Movement::Glyph, Direction::Right) => {
                 if self.cursor_glyph_idx < self.buffer.with(|buff| buff.len()) {
                     self.cursor_glyph_idx += 1;
                     return true;
                 }
                 false
-            }
+            },
             (Movement::Line, Direction::Right) => {
                 if self.cursor_glyph_idx < self.buffer.with(|buff| buff.len()) {
                     self.cursor_glyph_idx = self.buffer.with(|buff| buff.len());
                     return true;
                 }
                 false
-            }
+            },
             (Movement::Line, Direction::Left) => {
                 if self.cursor_glyph_idx > 0 {
                     self.cursor_glyph_idx = 0;
                     return true;
                 }
                 false
-            }
+            },
             (Movement::Word, Direction::Right) => self.buffer.with(|buff| {
                 for (idx, word) in buff.unicode_word_indices() {
                     let word_end_idx = idx + word.len();
@@ -193,11 +194,11 @@ impl TextInput {
                     self.cursor_glyph_idx = prev_word_idx;
                     true
                 })
-            }
+            },
             (movement, dir) => {
                 dbg!(movement, dir);
                 false
-            }
+            },
         }
     }
 
@@ -259,10 +260,10 @@ impl TextInput {
 
         self.update_text_layout();
         match clip_dir {
-            ClipDirection::None => {}
+            ClipDirection::None => {},
             ClipDirection::Forward => {
                 self.clip_offset_x = self.clip_txt_buf.as_ref().unwrap().size().width - node_width
-            }
+            },
             ClipDirection::Backward => self.clip_offset_x = 0.0,
         }
     }
@@ -321,7 +322,7 @@ impl TextInput {
 
         let old_width = self.width;
         self.width = text_layout
-            .hit_position(self.buffer.with(|buff| buff.len()))
+            .hit_position(self.buffer.with(|buff| buff.len() + 1))
             .point
             .x as f32;
         self.height = self.font_size;
@@ -377,15 +378,15 @@ impl TextInput {
                         (Modifiers::CONTROL, "a", false) => {
                             self.select_all();
                             true
-                        }
+                        },
                         (Modifiers::META, "a", true) => {
                             self.select_all();
                             true
-                        }
+                        },
                         _ => {
                             self.selection = 0..0;
                             false
-                        }
+                        },
                     };
 
                 if handled_modifier_command {
@@ -402,7 +403,7 @@ impl TextInput {
                 self.buffer
                     .update(|buf| buf.insert_str(self.cursor_glyph_idx, &ch.clone()));
                 self.move_cursor(Movement::Glyph, Direction::Right)
-            }
+            },
             Key::Backspace => {
                 let selection = self.selection.clone();
                 if selection != (0..0) {
@@ -428,7 +429,7 @@ impl TextInput {
                     });
                     true
                 }
-            }
+            },
             Key::Delete => {
                 let prev_cursor_idx = self.cursor_glyph_idx;
 
@@ -450,11 +451,11 @@ impl TextInput {
                 // TODO: extract moving to next word logic as a method and use it here instead
                 self.cursor_glyph_idx = prev_cursor_idx;
                 true
-            }
+            },
             Key::Escape => {
                 cx.app_state.clear_focus();
                 true
-            }
+            },
             Key::End => self.move_cursor(Movement::Line, Direction::Right),
             Key::Home => self.move_cursor(Movement::Line, Direction::Left),
             Key::ArrowLeft => {
@@ -467,7 +468,7 @@ impl TextInput {
                 } else {
                     self.move_cursor(Movement::Glyph, Direction::Left)
                 }
-            }
+            },
             Key::ArrowRight => {
                 if !self.selection.is_empty() {
                     self.cursor_glyph_idx = self.selection.end;
@@ -478,11 +479,11 @@ impl TextInput {
                 } else {
                     self.move_cursor(Movement::Glyph, Direction::Right)
                 }
-            }
+            },
             _ => {
                 dbg!("Unhandled key");
                 false
-            }
+            },
         }
     }
 }
@@ -554,22 +555,22 @@ impl View for TextInput {
                         .unwrap()
                         .hit_point(Point::new(
                             event.pos.x + self.clip_start_x - padding_left as f64,
-                            // TODO: prevent cursor incorrectly going to end of buffer when clicking
-                            // slightly below the text
+                            // TODO: prevent cursor incorrectly going to end of buffer when
+                            // clicking slightly below the text
                             event.pos.y - padding_top as f64,
                         ))
                         .index;
                 }
                 true
-            }
+            },
             Event::KeyDown(event) => self.handle_key_down(cx, event),
             Event::PointerMove(_) => {
                 if !matches!(cx.app_state.cursor, Some(CursorStyle::Text)) {
                     cx.app_state.cursor = Some(CursorStyle::Text);
-                    return false;
+                    return true;
                 }
                 false
-            }
+            },
             _ => false,
         };
 
@@ -603,7 +604,6 @@ impl View for TextInput {
                 );
             }
             let text_node = self.text_node.unwrap();
-
             let style = Style::BASE
                 .width(Dimension::Length(self.width))
                 .height(Dimension::Length(self.height))
@@ -661,10 +661,10 @@ impl View for TextInput {
                         .hit_position(self.cursor_glyph_idx);
                     self.cursor_x = hit_pos.point.x;
                 }
-            }
+            },
             InputKind::MultiLine { .. } => {
                 todo!();
-            }
+            },
         }
 
         let location = node_layout.location;
