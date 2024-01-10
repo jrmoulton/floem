@@ -28,6 +28,7 @@ pub use toggle_button::*;
 mod tooltip;
 pub use tooltip::*;
 
+pub mod dropdown;
 pub mod slider;
 
 mod button;
