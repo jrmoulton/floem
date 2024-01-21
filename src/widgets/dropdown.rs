@@ -102,7 +102,7 @@ impl View for DropDown {
     }
 }
 
-pub fn dropdown<MF, V1, I, T, V2, AIF>(iterator: I, main_view: MF, active_item: AIF) -> DropDown
+pub fn dropdown<MF, V1, I, T, V2, AIF>(main_view: MF, iterator: I, active_item: AIF) -> DropDown
 where
     MF: Fn(T) -> V1 + 'static,
     I: IntoIterator<Item = V2> + Clone + 'static,

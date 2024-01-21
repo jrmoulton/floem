@@ -2,6 +2,7 @@ pub mod buttons;
 pub mod checkbox;
 pub mod clipboard;
 pub mod context_menu;
+pub mod dropdown;
 pub mod form;
 pub mod images;
 pub mod inputs;
@@ -40,6 +41,7 @@ fn app_view() -> impl View {
         "Image",
         "Clipboard",
         "Slider",
+        "Dropdown",
     ]
     .into_iter()
     .collect();
@@ -162,6 +164,7 @@ fn app_view() -> impl View {
             "Image" => container_box(images::img_view()),
             "Clipboard" => container_box(clipboard::clipboard_view()),
             "Slider" => container_box(slider::slider_view()),
+            "Dropdown" => container_box(dropdown::dropdown_view()),
             _ => container_box(label(|| "Not implemented".to_owned())),
         },
     )
