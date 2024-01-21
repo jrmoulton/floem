@@ -18,12 +18,11 @@ use crate::{
 
 enum SliderUpdate {
     DisableEvents(bool),
-    Position(f32),
+    Percent(f32),
 }
 
-prop!(pub CircleRad: PxPct {} = PxPct::Pct(98.));
-prop!(pub BarExtends: bool {} = false);
-prop!(pub Thickness: PxPct {} = PxPct::Pct(30.));
+prop!(pub EdgeAlign: bool {} = false);
+prop!(pub HandleRadius: PxPct {} = PxPct::Pct(98.));
 
 prop_extracter! {
     SliderStyle {
@@ -113,8 +112,8 @@ pub struct Slider {
 pub fn slider(percent: impl Fn() -> f32 + 'static) -> Slider {
     let id = crate::id::Id::next();
     create_effect(move |_| {
-        let state = state();
-        id.update_state(SliderUpdate::Position(state), false);
+        let percent = percent();
+        id.update_state(SliderUpdate::Percent(percent));
     });
     Slider {
         data: ViewData::new(id),
@@ -149,7 +148,7 @@ impl View for Slider {
         if let Ok(update) = state.downcast::<SliderUpdate>() {
             match *update {
                 SliderUpdate::DisableEvents(disable) => self.disable_events = disable,
-                SliderUpdate::Position(position) => self.position = self.size.width * position,
+                SliderUpdate::Percent(percent) => self.percent = percent,
             }
             cx.request_layout(self.id());
         }
@@ -162,46 +161,65 @@ impl View for Slider {
         event: crate::event::Event,
     ) -> EventPropagation {
         if !self.disable_events {
-            match event {
+            let pos_changed = match event {
                 crate::event::Event::PointerDown(event) => {
                     cx.update_active(self.id());
                     cx.app_state_mut().request_layout(self.id());
                     self.held = true;
-                    self.position = event.pos.x as f32;
+                    self.percent = event.pos.x as f32 / self.size.width * 100.;
+                    true
                 }
                 crate::event::Event::PointerUp(event) => {
                     cx.app_state_mut().request_layout(self.id());
 
                     // set the state based on the position of the slider
+                    let changed = self.held;
                     if self.held {
-                        self.position = event.pos.x as f32;
+                        self.percent = event.pos.x as f32 / self.size.width * 100.;
                         self.update_restrict_position();
                     }
                     self.held = false;
+                    changed
                 }
                 crate::event::Event::PointerMove(event) => {
                     cx.app_state_mut().request_layout(self.id());
                     if self.held {
-                        self.position = event.pos.x as f32;
-                        self.update_restrict_position();
+                        self.percent = event.pos.x as f32 / self.size.width * 100.;
+                        true
+                    } else {
+                        false
                     }
                 }
                 crate::event::Event::FocusLost => {
                     self.held = false;
+                    false
                 }
                 crate::event::Event::KeyDown(event) => {
                     if event.key.logical_key == Key::Named(NamedKey::ArrowLeft) {
                         cx.app_state_mut().request_layout(self.id());
-                        self.position -= (self.size.width - self.circle.radius as f32 * 2.) * 0.1;
-                        self.update_restrict_position();
+                        self.percent -= 10.;
+                        true
                     } else if event.key.logical_key == Key::Named(NamedKey::ArrowRight) {
                         cx.app_state_mut().request_layout(self.id());
-                        self.position += (self.size.width - self.circle.radius as f32 * 2.) * 0.1;
-                        self.update_restrict_position();
+                        self.percent += 10.;
+                        true
+                    } else {
+                        false
                     }
                 }
-                _ => {}
+                _ => false,
             };
+
+            self.update_restrict_position();
+
+            if pos_changed && self.percent != self.prev_percent {
+                if let Some(onchangepx) = &self.onchangepx {
+                    onchangepx(self.handle_center());
+                }
+                if let Some(onchangepct) = &self.onchangepct {
+                    onchangepct(self.percent)
+                }
+            }
         }
         EventPropagation::Continue
     }
@@ -333,7 +351,7 @@ impl Slider {
         let id = self.id();
         create_effect(move |_| {
             let state = state();
-            id.update_state(SliderUpdate::DisableEvents(state), false);
+            id.update_state(SliderUpdate::DisableEvents(state));
         });
         self
     }
