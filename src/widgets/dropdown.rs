@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use floem_reactive::create_effect;
 use kurbo::{Point, Rect};
 
 use crate::{
@@ -55,6 +56,24 @@ impl View for DropDown {
         layout_rect
     }
 
+    fn update(&mut self, _cx: &mut crate::context::UpdateCx, state: Box<dyn std::any::Any>) {
+        if let Ok(state) = state.downcast::<bool>() {
+            if *state {
+                if self.overlay_id.is_none() {
+                    let layout = self.layout_rect.unwrap_or_default();
+                    let point = self.window_origin.unwrap_or_default() + (0., layout.height());
+                    let list = self.list_view.clone();
+                    self.overlay_id = Some(add_overlay(point, move |_| {
+                        list().style(move |s| s.width(layout.width()))
+                    }));
+                }
+            } else if let Some(id) = self.overlay_id {
+                remove_overlay(id);
+                self.overlay_id = None;
+            }
+        }
+    }
+
     fn event(
         &mut self,
         cx: &mut crate::context::EventCx,
@@ -108,5 +127,24 @@ where
         overlay_id: None,
         window_origin: None,
         layout_rect: None,
+    }
+}
+
+impl DropDown {
+    pub fn show_list(self, show: impl Fn() -> bool + 'static) -> Self {
+        let id = self.id();
+        create_effect(move |_| {
+            let state = show();
+            id.update_state(state);
+        });
+        self
+    }
+}
+
+impl Drop for DropDown {
+    fn drop(&mut self) {
+        if let Some(id) = self.overlay_id {
+            remove_overlay(id)
+        }
     }
 }
