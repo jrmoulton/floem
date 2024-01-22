@@ -980,10 +980,11 @@ impl WindowHandle {
                         cx.app_state.request_all(self.id);
                     }
                     UpdateMessage::RemoveOverlay { id } => {
-                        let mut overlay = self.view.overlays.remove(&id).unwrap();
-                        cx.app_state.remove_view(&mut overlay);
-                        overlay.scope.dispose();
-                        cx.app_state.request_all(self.id);
+                        if let Some(mut overlay) = self.view.overlays.remove(&id) {
+                            cx.app_state.remove_view(&mut overlay);
+                            overlay.scope.dispose();
+                            cx.app_state.request_all(self.id);
+                        }
                     }
                 }
             }
