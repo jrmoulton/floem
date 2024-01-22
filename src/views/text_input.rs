@@ -59,27 +59,45 @@ prop_extracter! {
     }
 }
 
+struct PasswordState {
+    buffer: String,
+    txt_layout: Option<TextLayout>,
+    asterisk_size: Size,
+}
+
+impl PasswordState {
+    fn ensure_buff_len_eq(&mut self, target_len: usize) {
+        if self.buffer.len() < target_len {
+            self.buffer.reserve(target_len);
+            for _ in 0..target_len - self.buffer.len() {
+                self.buffer.push('*');
+            }
+        } else {
+            self.buffer.truncate(target_len);
+        }
+    }
+}
+
 /// Text Input View
 pub struct TextInput {
     data: ViewData,
-    buffer: RwSignal<String>,
-    pub(crate) placeholder_text: Option<String>,
-    placeholder_buff: Option<TextLayout>,
+    pub(crate) buffer: RwSignal<String>,
+    pub(crate) placeholder_buff: Option<String>,
+    placeholder_txt_lay: Option<TextLayout>,
     placeholder_style: PlaceholderStyle,
     selection_style: SelectionStyle,
     // Where are we in the main buffer
     cursor_glyph_idx: usize,
     // This can be retrieved from the glyph, but we store it for efficiency
     cursor_x: f64,
-    text_buf: Option<TextLayout>,
+    text_layout: Option<TextLayout>,
     text_node: Option<Node>,
     // Shown when the width exceeds node width for single line input
-    clipped_text: Option<String>,
-    // Glyph index from which we started clipping
+    clip_text_buff: Option<String>,
     clip_start_idx: usize,
     // This can be retrieved from the clip start glyph, but we store it for efficiency
     clip_start_x: f64,
-    clip_txt_buf: Option<TextLayout>,
+    clip_txt_layout: Option<TextLayout>,
     // When the visible range changes, we also may need to have a small offset depending on the direction we moved.
     // This makes sure character under the cursor is always fully visible and correctly aligned,
     // and may cause the last character in the opposite direction to be "cut"
@@ -87,12 +105,13 @@ pub struct TextInput {
     selection: Option<Range<usize>>,
     width: f32,
     height: f32,
-    // Approx max size of a glyph, given the current font weight & size.
+    // Approx max size of a glyph(currently using 'W' as measurement), given the current font weight & size
     glyph_max_size: Size,
     style: Extracter,
     font: FontProps,
     cursor_width: f64, // TODO: make this configurable
-    is_focused: bool,
+    pub(crate) is_focused: bool,
+    password_state: Option<PasswordState>,
     last_cursor_action_on: Instant,
 }
 
@@ -109,6 +128,12 @@ pub enum Direction {
     Right,
 }
 
+pub(crate) enum InputStateMsg {
+    Text(String),
+    Focused(bool),
+    Password(bool),
+}
+
 /// Text Input View
 pub fn text_input(buffer: RwSignal<String>) -> TextInput {
     let id = Id::next();
@@ -117,22 +142,27 @@ pub fn text_input(buffer: RwSignal<String>) -> TextInput {
     {
         create_effect(move |_| {
             let text = buffer.get();
-            id.update_state((text, is_focused.get()));
+            id.update_state(InputStateMsg::Text(text));
+        });
+
+        create_effect(move |_| {
+            let focused = is_focused.get();
+            id.update_state(InputStateMsg::Focused(focused));
         });
     }
 
     TextInput {
         data: ViewData::new(id),
         cursor_glyph_idx: 0,
-        placeholder_text: None,
         placeholder_buff: None,
+        placeholder_txt_lay: None,
         placeholder_style: Default::default(),
         selection_style: Default::default(),
         buffer,
-        text_buf: None,
+        text_layout: None,
         text_node: None,
-        clipped_text: None,
-        clip_txt_buf: None,
+        clip_text_buff: None,
+        clip_txt_layout: None,
         style: Default::default(),
         font: FontProps::default(),
         cursor_x: 0.0,
@@ -146,6 +176,7 @@ pub fn text_input(buffer: RwSignal<String>) -> TextInput {
         height: 0.0,
         is_focused: false,
         last_cursor_action_on: Instant::now(),
+        password_state: None,
     }
     .keyboard_navigatable()
     .on_event_stop(EventListener::FocusGained, move |_| {
@@ -287,20 +318,43 @@ impl TextInput {
         }
     }
 
-    fn clip_text(&mut self, node_layout: &Layout) {
-        let virt_text = self.text_buf.as_ref().unwrap();
-        let node_width = node_layout.size.width as f64;
-        let cursor_text_loc = Cursor::new(0, self.cursor_glyph_idx);
-        let layout_cursor = virt_text.layout_cursor(&cursor_text_loc);
-        let cursor_glyph_pos = virt_text.hit_position(layout_cursor.glyph);
-        let cursor_x = cursor_glyph_pos.point.x;
+    fn get_cursor_x(&self) -> f64 {
+        if let Some(state) = self.password_state.as_ref() {
+            self.cursor_glyph_idx as f64 * state.asterisk_size.width as f64
+        } else {
+            let virt_text = self.text_layout.as_ref().unwrap();
+            let cursor_text_loc = Cursor::new(0, self.cursor_glyph_idx);
+            let layout_cursor = virt_text.layout_cursor(&cursor_text_loc);
+            let cursor_glyph_pos = virt_text.hit_position(layout_cursor.glyph);
+            cursor_glyph_pos.point.x
+        }
+    }
 
+    fn get_clip_start_end(&self, node_width: f64, clip_start_x: f64) -> (usize, usize) {
+        if let Some(password_state) = self.password_state.as_ref() {
+            let asterisk_size = password_state.asterisk_size.width;
+            let clip_start = (clip_start_x / asterisk_size).floor() as usize;
+            let clip_end = ((clip_start_x + node_width) / asterisk_size).ceil() as usize;
+            (clip_start, clip_end)
+        } else {
+            let virt_text = self.text_layout.as_ref().unwrap();
+            let clip_start = virt_text.hit_point(Point::new(clip_start_x, 0.0)).index;
+            let clip_end = virt_text
+                .hit_point(Point::new(clip_start_x + node_width, 0.0))
+                .index;
+            (clip_start, clip_end)
+        }
+    }
+
+    fn clip_text(&mut self, node_layout: &Layout) {
+        let node_width = node_layout.size.width as f64;
         let mut clip_start_x = self.clip_start_x;
+        let cursor_x = self.get_cursor_x();
 
         let visible_range = clip_start_x..=clip_start_x + node_width;
 
         let mut clip_dir = ClipDirection::None;
-        if !visible_range.contains(&cursor_glyph_pos.point.x) {
+        if !visible_range.contains(&cursor_x) {
             if cursor_x < *visible_range.start() {
                 clip_start_x = cursor_x;
                 clip_dir = ClipDirection::Backward;
@@ -310,30 +364,32 @@ impl TextInput {
             }
         }
         self.cursor_x = cursor_x;
-
-        let clip_start = virt_text.hit_point(Point::new(clip_start_x, 0.0)).index;
-        let clip_end = virt_text
-            .hit_point(Point::new(clip_start_x + node_width, 0.0))
-            .index;
+        let (clip_start_idx, clip_end_idx) = self.get_clip_start_end(node_width, clip_start_x);
 
         let new_text = self
             .buffer
             .get()
             .chars()
-            .skip(clip_start)
-            .take(clip_end - clip_start)
+            .skip(clip_start_idx)
+            .take(clip_end_idx - clip_start_idx)
             .collect();
 
         self.cursor_x -= clip_start_x;
-        self.clip_start_idx = clip_start;
+        self.clip_start_idx = clip_start_idx;
         self.clip_start_x = clip_start_x;
-        self.clipped_text = Some(new_text);
+        self.clip_text_buff = Some(new_text);
 
         self.update_text_layout();
         match clip_dir {
             ClipDirection::None => {}
+            ClipDirection::Forward if self.password_state.is_some() => {
+                // let clip_width =
+                //     (clip_end_idx - clip_start_idx) * self.asterisk_size.width as usize;
+                self.clip_offset_x = 0.;
+            }
             ClipDirection::Forward => {
-                self.clip_offset_x = self.clip_txt_buf.as_ref().unwrap().size().width - node_width
+                self.clip_offset_x =
+                    self.clip_txt_layout.as_ref().unwrap().size().width - node_width
             }
             ClipDirection::Backward => self.clip_offset_x = 0.0,
         }
@@ -380,7 +436,7 @@ impl TextInput {
             PxPct::Px(padding) => padding as f32,
             PxPct::Pct(pct) => pct as f32 * layout.size.width,
         };
-        self.text_buf
+        self.text_layout
             .as_ref()
             .unwrap()
             .hit_point(Point::new(
@@ -399,15 +455,25 @@ impl TextInput {
             return Rect::ZERO;
         };
 
-        let virtual_text = self.text_buf.as_ref().unwrap();
+        let virtual_text = self.text_layout.as_ref().unwrap();
         let text_height = virtual_text.size().height;
 
-        let selection_start_x =
-            virtual_text.hit_position(selection.start).point.x - self.clip_start_x;
+        let selection_start_x = if let Some(password_state) = self.password_state.as_ref() {
+            (selection.start as f64 * password_state.asterisk_size.width as usize as f64)
+                - self.clip_start_x
+        } else {
+            virtual_text.hit_position(selection.start).point.x - self.clip_start_x
+        };
+
         let selection_start_x = selection_start_x.max(node_layout.location.x as f64 - left_padding);
 
-        let selection_end_x =
-            virtual_text.hit_position(selection.end).point.x + left_padding - self.clip_start_x;
+        let selection_end_x = if let Some(password_state) = self.password_state.as_ref() {
+            selection_start_x
+                + (selection.end as f64 * password_state.asterisk_size.width)
+                + left_padding
+        } else {
+            virtual_text.hit_position(selection.end).point.x + left_padding - self.clip_start_x
+        };
         let selection_end_x =
             selection_end_x.min(selection_start_x + self.width as f64 + left_padding);
 
@@ -422,6 +488,13 @@ impl TextInput {
             selection_start,
             Point::new(selection_end_x, selection_start.y + text_height),
         )
+    }
+
+    fn get_asterisk_glyph_size(&self) -> Size {
+        let mut tmp = TextLayout::new();
+        let attrs_list = self.get_text_attrs();
+        tmp.set_text("*", attrs_list);
+        tmp.size()
     }
 
     /// Determine approximate max size of a single glyph, given the current font weight & size
@@ -453,18 +526,27 @@ impl TextInput {
         self.buffer
             .with_untracked(|buff| text_layout.set_text(buff, attrs_list.clone()));
 
+        let asterisk_size = self.get_asterisk_glyph_size();
+        if let Some(password_state) = self.password_state.as_mut() {
+            password_state.asterisk_size = asterisk_size;
+            let attrs_list = attrs_list.clone();
+            let mut text_layout = TextLayout::new();
+            text_layout.set_text(&password_state.buffer, attrs_list);
+            password_state.txt_layout = Some(text_layout);
+        }
+
         let glyph_max_size = self.get_font_glyph_max_size();
         self.height = glyph_max_size.height as f32;
         self.glyph_max_size = glyph_max_size;
 
-        // main buff should always get updated
-        self.text_buf = Some(text_layout.clone());
+        // should always get updated
+        self.text_layout = Some(text_layout.clone());
 
-        if let Some(cr_text) = self.clipped_text.clone().as_ref() {
-            let mut clp_txt_lay = text_layout;
-            clp_txt_lay.set_text(cr_text, attrs_list);
+        if let Some(clip_text) = self.clip_text_buff.clone().as_ref() {
+            let mut clip_txt_lay = text_layout;
+            clip_txt_lay.set_text(clip_text, attrs_list);
 
-            self.clip_txt_buf = Some(clp_txt_lay);
+            self.clip_txt_layout = Some(clip_txt_lay);
         }
     }
 
@@ -522,7 +604,7 @@ impl TextInput {
         let len = self.buffer.with(|val| val.len());
         self.cursor_glyph_idx = len;
 
-        let text_buf = self.text_buf.as_ref().unwrap();
+        let text_buf = self.text_layout.as_ref().unwrap();
         let buf_width = text_buf.size().width;
         let node_width = node_layout.size.width as f64;
 
@@ -858,6 +940,20 @@ impl TextInput {
             0.0,
         );
     }
+
+    fn paint_buff_text(&mut self, cx: &mut crate::context::PaintCx, start: Point) {
+        let (layout, pos) = if let Some(clip_txt) = self.clip_txt_layout.as_ref() {
+            (clip_txt, Point::new(start.x - self.clip_offset_x, start.y))
+        } else {
+            (self.text_layout.as_ref().unwrap(), start)
+        };
+
+        if let Some(password_state) = self.password_state.as_ref() {
+            cx.draw_text(&password_state.txt_layout.as_ref().unwrap(), pos);
+        } else {
+            cx.draw_text(layout, pos);
+        }
+    }
 }
 
 fn replace_range(buff: &mut String, del_range: Range<usize>, replacement: Option<&str>) {
@@ -942,13 +1038,28 @@ impl View for TextInput {
     }
 
     fn update(&mut self, cx: &mut UpdateCx, state: Box<dyn Any>) {
-        if let Ok(state) = state.downcast::<(String, bool)>() {
-            let (_, is_focused) = *state;
-            if is_focused {
-                self.cursor_glyph_idx = self.buffer.with_untracked(|buff| buff.len());
+        if let Ok(state) = state.downcast::<InputStateMsg>() {
+            match *state {
+                InputStateMsg::Text(_) => {}
+                InputStateMsg::Focused(is_focused) => {
+                    if is_focused {
+                        self.cursor_glyph_idx = self.buffer.with_untracked(|buff| buff.len());
+                    }
+                    self.is_focused = is_focused;
+                }
+                InputStateMsg::Password(is_password) => {
+                    self.password_state = if is_password {
+                        Some(PasswordState {
+                            asterisk_size: self.get_asterisk_glyph_size(),
+                            buffer: "*".repeat(self.buffer.with_untracked(|buff| buff.len())),
+                            txt_layout: None,
+                        })
+                    } else {
+                        None
+                    }
+                }
             }
 
-            self.is_focused = is_focused;
             cx.request_layout(self.id());
         } else {
             eprintln!("downcast failed");
@@ -1009,7 +1120,7 @@ impl View for TextInput {
 
     fn style(&mut self, cx: &mut crate::context::StyleCx<'_>) {
         let style = cx.style();
-        if self.font.read(cx) || self.text_buf.is_none() {
+        if self.font.read(cx) || self.text_layout.is_none() {
             self.update_text_layout();
             cx.app_state_mut().request_layout(self.id());
         }
@@ -1047,12 +1158,12 @@ impl View for TextInput {
             let style = cx.app_state_mut().get_builtin_style(self.id());
             let node_width = layout.size.width;
 
-            if self.placeholder_buff.is_none() {
-                if let Some(placeholder_text) = &self.placeholder_text {
+            if self.placeholder_txt_lay.is_none() {
+                if let Some(placeholder_text) = &self.placeholder_buff {
                     let mut placeholder_buff = TextLayout::new();
                     let attrs_list = self.get_placeholder_text_attrs();
                     placeholder_buff.set_text(placeholder_text, attrs_list);
-                    self.placeholder_buff = Some(placeholder_buff);
+                    self.placeholder_txt_lay = Some(placeholder_buff);
                 }
             }
 
@@ -1063,7 +1174,7 @@ impl View for TextInput {
                 // apply it to the inner text node as well
                 crate::unit::PxPctAuto::Pct(_) => node_width,
                 crate::unit::PxPctAuto::Auto => {
-                    APPROX_VISIBLE_CHARS_TARGET * self.glyph_max_size.width as f32
+                    APPROX_VISIBLE_CHARS_TARGET * self.get_font_glyph_max_size().width as f32
                 }
             };
 
@@ -1102,8 +1213,12 @@ impl View for TextInput {
     fn compute_layout(&mut self, cx: &mut crate::context::ComputeLayoutCx) -> Option<Rect> {
         self.update_text_layout();
 
-        let text_buf = self.text_buf.as_ref().unwrap();
-        let buf_width = text_buf.size().width;
+        let main_txt_layout = self.text_layout.as_ref().unwrap();
+        let buf_width = if let Some(password_state) = self.password_state.as_ref() {
+            password_state.asterisk_size.width * self.buffer.get_untracked().len() as f64
+        } else {
+            main_txt_layout.size().width
+        };
         let text_node = self.text_node.unwrap();
         let node_layout = *cx.app_state.taffy.layout(text_node).unwrap();
         let node_width = node_layout.size.width as f64;
@@ -1111,17 +1226,44 @@ impl View for TextInput {
         if buf_width > node_width {
             self.clip_text(&node_layout);
         } else {
-            self.clip_txt_buf = None;
+            self.clip_txt_layout = None;
+            self.clip_text_buff = None;
             self.clip_start_idx = 0;
             self.clip_start_x = 0.0;
-            let hit_pos = self
-                .text_buf
-                .as_ref()
-                .unwrap()
-                .hit_position(self.cursor_glyph_idx);
-            self.cursor_x = hit_pos.point.x;
+
+            if let Some(password_state) = self.password_state.as_ref() {
+                self.cursor_x = self.cursor_glyph_idx as f64 * password_state.asterisk_size.width;
+            } else {
+                let hit_pos = self
+                    .text_layout
+                    .as_ref()
+                    .unwrap()
+                    .hit_position(self.cursor_glyph_idx);
+                self.cursor_x = hit_pos.point.x;
+            }
         }
 
+        let attrs_list = self.get_text_attrs();
+        if let Some(password_state) = self.password_state.as_mut() {
+            let len = self
+                .clip_text_buff
+                .as_ref()
+                .map(|ctb| ctb.len())
+                .unwrap_or(self.buffer.get_untracked().len());
+
+            if password_state.txt_layout.is_none() {
+                let mut txt_layout = TextLayout::new();
+                txt_layout.set_text(&password_state.buffer, attrs_list);
+                password_state.txt_layout = Some(txt_layout);
+            } else if password_state.buffer.len() != len {
+                password_state.ensure_buff_len_eq(len);
+                password_state
+                    .txt_layout
+                    .as_mut()
+                    .unwrap()
+                    .set_text(&password_state.buffer, attrs_list);
+            }
+        }
         None
     }
 
@@ -1129,7 +1271,7 @@ impl View for TextInput {
         if !cx.app_state.is_focused(&self.id())
             && self.buffer.with_untracked(|buff| buff.is_empty())
         {
-            if let Some(placeholder_buff) = &self.placeholder_buff {
+            if let Some(placeholder_buff) = &self.placeholder_txt_lay {
                 self.paint_placeholder_text(placeholder_buff, cx);
             }
             return;
@@ -1141,14 +1283,7 @@ impl View for TextInput {
         let location = node_layout.location;
         let text_start_point = Point::new(location.x as f64, location.y as f64);
 
-        if let Some(clip_txt) = self.clip_txt_buf.as_mut() {
-            cx.draw_text(
-                clip_txt,
-                Point::new(text_start_point.x - self.clip_offset_x, text_start_point.y),
-            );
-        } else {
-            cx.draw_text(self.text_buf.as_ref().unwrap(), text_start_point);
-        }
+        self.paint_buff_text(cx, text_start_point);
 
         let is_cursor_visible = cx.app_state.is_focused(&self.id())
             && self.selection.is_none()

@@ -3,7 +3,7 @@ use floem::{
     peniko::Color,
     reactive::create_rw_signal,
     view::View,
-    views::{Decorators, SelectionCornerRadius},
+    views::{label, Decorators, SelectionCornerRadius},
     widgets::{text_input, PlaceholderTextClass},
 };
 
@@ -11,6 +11,7 @@ use crate::form::{form, form_item};
 
 pub fn text_input_view() -> impl View {
     let text = create_rw_signal("".to_string());
+    let show_password = create_rw_signal(false);
 
     form({
         (
@@ -46,6 +47,21 @@ pub fn text_input_view() -> impl View {
                     })
                     .keyboard_navigatable()
             }),
+            form_item("Password Input:".to_string(), 120.0, move || {
+                text_input(text)
+                    .password(move || !show_password.get())
+                    .keyboard_navigatable()
+            }),
+            label(move || {
+                format!(
+                    "{} password",
+                    if show_password.get() { "Hide" } else { "Show" }
+                )
+            })
+            .on_click_stop(move |_| {
+                show_password.update(|show| *show = !*show);
+            }),
+
             form_item("Disabled Input:".to_string(), 120.0, move || {
                 text_input(text).disabled(|| true)
             }),
