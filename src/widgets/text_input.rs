@@ -1,7 +1,7 @@
 use crate::{
     style_class,
     view::View,
-    views::{self, Decorators, TextInput, InputStateMsg},
+    views::{self, Decorators, InputStateMsg, TextInput},
 };
 
 use floem_reactive::RwSignal;
@@ -28,7 +28,7 @@ impl TextInput {
         let id = self.id();
         create_effect(move |_| {
             let is_password = is_password_fn();
-            id.update_state(InputStateMsg::Password(is_password), false);
+            id.update_state(InputStateMsg::Password(is_password));
         });
         self
     }
