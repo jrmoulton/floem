@@ -176,6 +176,27 @@ fn app_view() -> impl View {
         .style(|s| s.padding(5.0).width_full().height_full().gap(5.0, 0.0))
         .window_title(|| "Widget Gallery".to_owned());
 
+    let view = view.style(|s| {
+        s.class(floem::widgets::dropdown::DropDownClass, |s| {
+            s.items_center()
+                .justify_between()
+                .size_full()
+                .width(75)
+                .border(1)
+                .padding(3)
+                .border_radius(7.pct())
+        })
+        .class(floem::widgets::dropdown::DropDownListClass, |s| {
+            s.width_full()
+                .justify_center()
+                .padding_vert(3.)
+                .background(Color::GRAY)
+                .class(floem::widgets::ListItemClass, |s| {
+                    s.hover(|s| s.background(Color::GREEN).size_full())
+                })
+        })
+    });
+
     let id = view.id();
     view.on_event_stop(EventListener::KeyUp, move |e| {
         if let Event::KeyUp(e) = e {

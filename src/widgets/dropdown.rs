@@ -113,12 +113,13 @@ where
 {
     let list_view = Rc::new(move || {
         let iterator = iterator.clone();
-        Box::new(list(iterator)) as Box<dyn View>
+        Box::new(list(iterator).class(DropDownListClass)) as Box<dyn View>
     });
 
-    let main_view = dyn_container(active_item, move |item| Box::new(main_view(item)))
-        .class(DropDownClass)
-        .keyboard_navigatable();
+    let main_view = dyn_container(active_item, move |item| {
+        Box::new(main_view(item).class(DropDownClass))
+    })
+    .keyboard_navigatable();
 
     DropDown {
         view_data: ViewData::new(Id::next()),

@@ -59,29 +59,14 @@ pub fn dropdown_view() -> impl View {
                                 .hover(move |s| s.background(Color::LIGHT_GRAY))
                         }),
                     ))
-                    .style(|s| {
-                        s.items_center()
-                            .justify_between()
-                            .size_full()
-                            .width(75)
-                            .border(1)
-                            .padding(3)
-                            .border_radius(7.pct())
-                    })
                 },
                 // iterator to build list in dropdown
                 Values::iter().map(move |item| {
                     label(move || item)
+                        .style(|s| s.size_full())
                         .on_click_stop(move |_| {
                             driving_signal.set(item);
                             println!("Selected {item:?}!")
-                        })
-                        .style(|s| {
-                            s.width_full()
-                                .justify_center()
-                                .padding_vert(3.)
-                                .background(Color::GRAY)
-                                .hover(|s| s.background(floem::peniko::Color::GREEN))
                         })
                 }),
                 move || driving_signal.get(),
