@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use floem_winit::{
     keyboard::{KeyCode, PhysicalKey},
     window::Theme,
@@ -34,6 +36,9 @@ pub enum EventListener {
     PointerWheel,
     FocusGained,
     FocusLost,
+    DroppedFile,
+    HoveredFile,
+    HoveredFileCancelled,
     ThemeChanged,
     WindowClosed,
     WindowResized,
@@ -52,6 +57,9 @@ pub enum Event {
     PointerLeave,
     KeyDown(KeyEvent),
     KeyUp(KeyEvent),
+    DroppedFile(PathBuf),
+    HoveredFile(PathBuf),
+    HoveredFileCancelled,
     ImeEnabled,
     ImeDisabled,
     ImePreedit {
@@ -79,6 +87,9 @@ impl Event {
             | Event::PointerWheel(_)
             | Event::PointerLeave
             | Event::FocusGained
+            | Event::DroppedFile(_)
+            | Event::HoveredFile(_)
+            | Event::HoveredFileCancelled
             | Event::FocusLost
             | Event::ImeEnabled
             | Event::ImeDisabled
@@ -101,6 +112,9 @@ impl Event {
             | Event::PointerUp(_)
             | Event::PointerMove(_)
             | Event::PointerWheel(_)
+            | Event::DroppedFile(_)
+            | Event::HoveredFile(_)
+            | Event::HoveredFileCancelled
             | Event::PointerLeave => true,
             Event::KeyDown(_)
             | Event::KeyUp(_)
@@ -142,6 +156,9 @@ impl Event {
             | Event::PointerWheel(_)
             | Event::FocusGained
             | Event::FocusLost
+            | Event::DroppedFile(_)
+            | Event::HoveredFile(_)
+            | Event::HoveredFileCancelled
             | Event::ImeEnabled
             | Event::ImeDisabled
             | Event::ImePreedit { .. }
@@ -172,6 +189,9 @@ impl Event {
             | Event::KeyUp(_)
             | Event::FocusGained
             | Event::FocusLost
+            | Event::DroppedFile(_)
+            | Event::HoveredFile(_)
+            | Event::HoveredFileCancelled
             | Event::ImeEnabled
             | Event::ImeDisabled
             | Event::ImePreedit { .. }
@@ -205,6 +225,9 @@ impl Event {
             | Event::KeyUp(_)
             | Event::FocusGained
             | Event::FocusLost
+            | Event::DroppedFile(_)
+            | Event::HoveredFile(_)
+            | Event::HoveredFileCancelled
             | Event::ImeEnabled
             | Event::ImeDisabled
             | Event::ImePreedit { .. }
@@ -236,6 +259,9 @@ impl Event {
             | Event::KeyUp(_)
             | Event::FocusGained
             | Event::FocusLost
+            | Event::DroppedFile(_)
+            | Event::HoveredFile(_)
+            | Event::HoveredFileCancelled
             | Event::ImeEnabled
             | Event::ImeDisabled
             | Event::ImePreedit { .. }
@@ -272,6 +298,9 @@ impl Event {
             Event::WindowLostFocus => Some(EventListener::WindowLostFocus),
             Event::FocusLost => Some(EventListener::FocusLost),
             Event::FocusGained => Some(EventListener::FocusGained),
+            Event::DroppedFile(_) => Some(EventListener::DroppedFile),
+            Event::HoveredFile(_) => Some(EventListener::HoveredFile),
+            Event::HoveredFileCancelled => Some(EventListener::HoveredFileCancelled),
             Event::ThemeChanged(_) => Some(EventListener::ThemeChanged),
         }
     }

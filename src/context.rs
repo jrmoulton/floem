@@ -5,6 +5,7 @@ use std::{
     any::Any,
     collections::{HashMap, HashSet},
     ops::{Deref, DerefMut},
+    path::PathBuf,
     rc::Rc,
     time::Instant,
 };
@@ -80,6 +81,13 @@ pub(crate) enum FrameUpdate {
     Paint(Id),
 }
 
+#[derive(Clone)]
+pub(crate) enum FileDropState {
+    Cancelled,
+    Hovered(PathBuf),
+    Dropped(PathBuf),
+}
+
 /// Encapsulates and owns the global state of the application,
 /// including the `ViewState` of each view.
 pub struct AppState {
@@ -107,6 +115,8 @@ pub struct AppState {
     pub(crate) grid_bps: GridBreakpoints,
     pub(crate) clicking: HashSet<Id>,
     pub(crate) hovered: HashSet<Id>,
+    pub(crate) file_drop_over: HashSet<Id>,
+    pub(crate) hovered_file: Option<FileDropState>,
     /// This keeps track of all views that have an animation,
     /// regardless of the status of the animation
     pub(crate) cursor: Option<CursorStyle>,
@@ -150,6 +160,8 @@ impl AppState {
             dragging_over: HashSet::new(),
             clicking: HashSet::new(),
             hovered: HashSet::new(),
+            file_drop_over: HashSet::new(),
+            hovered_file: None,
             cursor: None,
             last_cursor: CursorIcon::Default,
             keyboard_navigation: false,
@@ -195,6 +207,7 @@ impl AppState {
         self.keyboard_navigable.remove(&id);
         self.draggable.remove(&id);
         self.dragging_over.remove(&id);
+        self.file_drop_over.remove(&id);
         self.clicking.remove(&id);
         self.hovered.remove(&id);
         self.clicking.remove(&id);
@@ -226,6 +239,10 @@ impl AppState {
         self.keyboard_navigable.contains(&id)
             && !self.is_disabled(&id)
             && !self.is_hidden_recursive(id)
+    }
+
+    pub fn has_file_drop(&self) -> bool {
+        self.hovered_file.is_some()
     }
 
     pub fn is_hovered(&self, id: &Id) -> bool {
@@ -736,6 +753,31 @@ impl<'a> EventCx<'a> {
                         if let Some(action) = self.get_event_listener(id, &EventListener::DragOver)
                         {
                             (*action)(&event);
+                        }
+                    } else if let Some(state) = self.app_state.hovered_file.clone() {
+                        self.app_state.file_drop_over.insert(id);
+                        match state {
+                            FileDropState::Cancelled => {
+                                if let Some(action) = self
+                                    .get_event_listener(id, &EventListener::HoveredFileCancelled)
+                                {
+                                    (*action)(&Event::HoveredFileCancelled);
+                                }
+                            }
+                            FileDropState::Hovered(path) => {
+                                if let Some(action) =
+                                    self.get_event_listener(id, &EventListener::HoveredFile)
+                                {
+                                    (*action)(&Event::HoveredFile(path));
+                                }
+                            }
+                            FileDropState::Dropped(path) => {
+                                if let Some(action) = self
+                                    .get_event_listener(id, &EventListener::HoveredFileCancelled)
+                                {
+                                    (*action)(&Event::DroppedFile(path));
+                                }
+                            }
                         }
                     } else {
                         self.app_state.hovered.insert(id);

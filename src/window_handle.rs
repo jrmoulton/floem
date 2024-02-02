@@ -1,5 +1,6 @@
 use std::{
     mem,
+    path::PathBuf,
     rc::Rc,
     time::{Duration, Instant},
 };
@@ -23,8 +24,8 @@ use crate::views::{container_box, stack, Decorators};
 use crate::{
     animate::{AnimPropKind, AnimUpdateMsg, AnimValue, AnimatedProp, SizeUnit},
     context::{
-        AppState, ComputeLayoutCx, EventCx, FrameUpdate, LayoutCx, MoveListener, PaintCx,
-        PaintState, ResizeListener, StyleCx, UpdateCx,
+        AppState, ComputeLayoutCx, EventCx, FileDropState, FrameUpdate, LayoutCx, MoveListener,
+        PaintCx, PaintState, ResizeListener, StyleCx, UpdateCx,
     },
     event::{Event, EventListener},
     id::{Id, IdPath, ID_PATHS},
@@ -161,14 +162,19 @@ impl WindowHandle {
         };
 
         let is_pointer_move = matches!(&event, Event::PointerMove(_));
-        let (was_hovered, was_dragging_over) = if is_pointer_move {
+        let (was_hovered, was_dragging_over, was_file_drop) = if is_pointer_move {
             cx.app_state.cursor = None;
             let was_hovered = std::mem::take(&mut cx.app_state.hovered);
             let was_dragging_over = std::mem::take(&mut cx.app_state.dragging_over);
+            let was_file_drop = std::mem::take(&mut cx.app_state.file_drop_over);
 
-            (Some(was_hovered), Some(was_dragging_over))
+            (
+                Some(was_hovered),
+                Some(was_dragging_over),
+                Some(was_file_drop),
+            )
         } else {
-            (None, None)
+            (None, None, None)
         };
 
         let is_pointer_down = matches!(&event, Event::PointerDown(_));
@@ -310,6 +316,47 @@ impl WindowHandle {
                     }
                 }
             }
+
+            let file_drop = &cx.app_state.file_drop_over.clone();
+            for id in was_file_drop.unwrap().symmetric_difference(file_drop) {
+                if file_drop.contains(id) {
+                    if let Some(file_state) = cx.app_state.hovered_file.take() {
+                        match file_state {
+                            FileDropState::Cancelled => {
+                                if let Some(action) =
+                                    cx.get_event_listener(*id, &EventListener::HoveredFileCancelled)
+                                {
+                                    (*action)(&Event::HoveredFileCancelled);
+                                }
+                            }
+                            FileDropState::Hovered(path) => {
+                                if let Some(action) =
+                                    cx.get_event_listener(*id, &EventListener::HoveredFile)
+                                {
+                                    (*action)(&Event::HoveredFile(path));
+                                }
+                            }
+                            FileDropState::Dropped(path) => {
+                                if let Some(action) =
+                                    cx.get_event_listener(*id, &EventListener::HoveredFile)
+                                {
+                                    (*action)(&Event::DroppedFile(path));
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    let id_path = ID_PATHS.with(|paths| paths.borrow().get(id).cloned());
+                    if let Some(id_path) = id_path {
+                        cx.unconditional_view_event(
+                            &mut self.view,
+                            Some(id_path.dispatch()),
+                            Event::HoveredFileCancelled,
+                        );
+                    }
+                }
+            }
+
             let dragging_over = &cx.app_state.dragging_over.clone();
             for id in was_dragging_over
                 .unwrap()
@@ -385,6 +432,18 @@ impl WindowHandle {
         self.event(Event::WindowMoved(point));
     }
 
+    pub(crate) fn hovered_file_event(&mut self, path: PathBuf) {
+        self.app_state.hovered_file = Some(FileDropState::Hovered(path));
+    }
+
+    pub(crate) fn dropped_file_event(&mut self, path: PathBuf) {
+        self.app_state.hovered_file = Some(FileDropState::Dropped(path));
+    }
+
+    pub(crate) fn hover_canceled_file_event(&mut self) {
+        self.app_state.hovered_file = None;
+    }
+
     pub(crate) fn key_event(&mut self, key_event: floem_winit::event::KeyEvent) {
         let event = KeyEvent {
             key: key_event,
@@ -404,6 +463,7 @@ impl WindowHandle {
                 pos,
                 modifiers: self.modifiers,
             };
+            dbg!("this");
             self.event(Event::PointerMove(event));
         }
     }
