@@ -16,7 +16,10 @@ use floem::{
     event::{Event, EventListener},
     keyboard::{Key, NamedKey},
     peniko::Color,
-    reactive::create_signal,
+    reactive::{
+        create_effect, create_signal, create_trigger, provide_context, use_context, RwSignal,
+        Trigger,
+    },
     style::{Background, CursorStyle, Transition},
     unit::UnitExt,
     view::View,
@@ -27,6 +30,19 @@ use floem::{
     widgets::button,
     EventPropagation,
 };
+
+type PopOver = Trigger;
+pub fn follow_popover(visible_state: RwSignal<bool>) {
+    let pop_over = use_context::<PopOver>().unwrap();
+    create_effect(move |_| {
+        pop_over.track();
+        visible_state.set(false);
+    });
+}
+pub fn popover_notify() {
+    let pop_over = use_context::<PopOver>().unwrap();
+    pop_over.notify();
+}
 
 fn app_view() -> impl View {
     let tabs: im::Vector<&str> = vec![
@@ -49,6 +65,9 @@ fn app_view() -> impl View {
 
     let (active_tab, set_active_tab) = create_signal(0);
 
+    let pop_over: PopOver = create_trigger();
+    provide_context(pop_over);
+
     let list = scroll({
         virtual_stack(
             VirtualDirection::Vertical,
@@ -63,6 +82,7 @@ fn app_view() -> impl View {
                     .unwrap();
                 stack((label(move || item).style(|s| s.font_size(18.0)),))
                     .on_click_stop(move |_| {
+                        popover_notify();
                         set_active_tab.update(|v: &mut usize| {
                             *v = tabs
                                 .get_untracked()
@@ -174,28 +194,8 @@ fn app_view() -> impl View {
 
     let view = h_stack((left, tab))
         .style(|s| s.padding(5.0).width_full().height_full().gap(5.0, 0.0))
+        .on_click_stop(move |_| popover_notify())
         .window_title(|| "Widget Gallery".to_owned());
-
-    let view = view.style(|s| {
-        s.class(floem::widgets::dropdown::DropDownClass, |s| {
-            s.items_center()
-                .justify_between()
-                .size_full()
-                .width(75)
-                .border(1)
-                .padding(3)
-                .border_radius(7.pct())
-        })
-        .class(floem::widgets::dropdown::DropDownListClass, |s| {
-            s.width_full()
-                .justify_center()
-                .padding_vert(3.)
-                .background(Color::GRAY)
-                .class(floem::widgets::ListItemClass, |s| {
-                    s.hover(|s| s.background(Color::GREEN).size_full())
-                })
-        })
-    });
 
     let id = view.id();
     view.on_event_stop(EventListener::KeyUp, move |e| {

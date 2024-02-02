@@ -15,6 +15,7 @@ use crate::{
         ViewData, Widget,
     },
     views::Decorators,
+    EventPropagation,
 };
 
 use super::list;
@@ -126,7 +127,10 @@ impl<T: 'static> Widget for DropDown<T> {
     ) -> crate::EventPropagation {
         #[allow(clippy::single_match)]
         match event {
-            crate::event::Event::PointerDown(_) => self.swap_state(),
+            crate::event::Event::PointerDown(_) => {
+                self.swap_state();
+                return EventPropagation::Stop;
+            }
             crate::event::Event::KeyUp(ref key_event)
                 if key_event.key.logical_key == Key::Named(NamedKey::Enter) =>
             {
