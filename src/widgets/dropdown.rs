@@ -1,8 +1,8 @@
 use std::{any::Any, rc::Rc};
 
 use floem_reactive::{as_child_of_current_scope, create_effect, create_updater, Scope};
+use floem_winit::keyboard::{Key, NamedKey};
 use kurbo::{Point, Rect};
-use taffy::geometry::Size;
 
 use crate::{
     action::{add_overlay, remove_overlay},
@@ -10,29 +10,31 @@ use crate::{
     style::{Style, StyleClass, Width},
     style_class,
     unit::PxPctAuto,
-    view::{default_compute_layout, default_event, view_children_set_parent_id, View, ViewData},
+    view::{
+        default_compute_layout, default_event, view_children_set_parent_id, AnyView, View,
+        ViewData, Widget,
+    },
     views::Decorators,
 };
 
 use super::list;
 
-type ChildFn<T> = dyn Fn(T) -> (Box<dyn View>, Scope);
+type ChildFn<T> = dyn Fn(T) -> (AnyView, Scope);
 
 style_class!(pub DropDownClass);
 
 pub struct DropDown<T: 'static> {
     view_data: ViewData,
-    main_view: Box<dyn View>,
+    main_view: Box<dyn Widget>,
     main_view_scope: Scope,
     main_fn: Box<ChildFn<T>>,
-    list_view: Rc<dyn Fn() -> Box<dyn View>>,
+    list_view: Rc<dyn Fn() -> AnyView>,
     list_style: Style,
     overlay_id: Option<Id>,
     window_origin: Option<Point>,
-    size: Size<f32>,
 }
 
-enum DropDownMessage {
+enum Message {
     OpenState(bool),
     ActiveElement(Box<dyn Any>),
 }
@@ -46,17 +48,31 @@ impl<T: 'static> View for DropDown<T> {
         &mut self.view_data
     }
 
-    fn for_each_child<'a>(&'a self, for_each: &mut dyn FnMut(&'a dyn View) -> bool) {
+    fn build(self) -> crate::view::AnyWidget {
+        Box::new(self.keyboard_navigatable())
+    }
+}
+
+impl<T: 'static> Widget for DropDown<T> {
+    fn view_data(&self) -> &ViewData {
+        &self.view_data
+    }
+
+    fn view_data_mut(&mut self) -> &mut ViewData {
+        &mut self.view_data
+    }
+
+    fn for_each_child<'a>(&'a self, for_each: &mut dyn FnMut(&'a dyn Widget) -> bool) {
         for_each(&self.main_view);
     }
 
-    fn for_each_child_mut<'a>(&'a mut self, for_each: &mut dyn FnMut(&'a mut dyn View) -> bool) {
+    fn for_each_child_mut<'a>(&'a mut self, for_each: &mut dyn FnMut(&'a mut dyn Widget) -> bool) {
         for_each(&mut self.main_view);
     }
 
     fn for_each_child_rev_mut<'a>(
         &'a mut self,
-        for_each: &mut dyn FnMut(&'a mut dyn View) -> bool,
+        for_each: &mut dyn FnMut(&'a mut dyn Widget) -> bool,
     ) {
         for_each(&mut self.main_view);
     }
@@ -74,46 +90,26 @@ impl<T: 'static> View for DropDown<T> {
     }
 
     fn compute_layout(&mut self, cx: &mut crate::context::ComputeLayoutCx) -> Option<Rect> {
-        if let Some(layout) = cx.get_layout(self.id()) {
-            self.size = layout.size;
-            if let PxPctAuto::Pct(pct) = self.list_style.get(Width) {
-                self.list_style = self
-                    .list_style
-                    .clone()
-                    .width(self.size.width as f64 * pct / 100.);
-            }
-        }
         self.window_origin = Some(cx.window_origin);
 
         default_compute_layout(self, cx)
     }
 
     fn update(&mut self, cx: &mut crate::context::UpdateCx, state: Box<dyn std::any::Any>) {
-        if let Ok(state) = state.downcast::<DropDownMessage>() {
+        if let Ok(state) = state.downcast::<Message>() {
             match *state {
-                DropDownMessage::OpenState(state) => {
-                    if state {
-                        if self.overlay_id.is_none() {
-                            let point = self.window_origin.unwrap_or_default()
-                                + (0., self.size.height as f64);
-                            let list = self.list_view.clone();
-                            let list_style = self.list_style.clone();
-                            self.overlay_id = Some(add_overlay(point, move |_| {
-                                list().style(move |s| s.apply(list_style.clone()))
-                            }));
-                        }
-                    } else if let Some(id) = self.overlay_id {
-                        remove_overlay(id);
-                        self.overlay_id = None;
-                    }
-                }
-                DropDownMessage::ActiveElement(val) => {
+                Message::OpenState(true) => self.open_dropdown(cx),
+                Message::OpenState(false) => self.close_dropdown(),
+                Message::ActiveElement(val) => {
                     if let Ok(val) = val.downcast::<T>() {
                         let old_child_scope = self.main_view_scope;
                         cx.app_state_mut().remove_view(&mut self.main_view);
-                        (self.main_view, self.main_view_scope) = (self.main_fn)(*val);
+                        let (main_view, main_view_scope) = (self.main_fn)(*val);
+                        self.main_view = main_view.build();
+                        self.main_view_scope = main_view_scope;
+
                         old_child_scope.dispose();
-                        self.main_view.id().set_parent(self.id());
+                        self.main_view.view_data().id.set_parent(self.id());
                         view_children_set_parent_id(&*self.main_view);
                         cx.request_all(self.id());
                     }
@@ -130,13 +126,11 @@ impl<T: 'static> View for DropDown<T> {
     ) -> crate::EventPropagation {
         #[allow(clippy::single_match)]
         match event {
-            crate::event::Event::PointerDown(_) => {
-                if self.overlay_id.is_some() {
-                    self.id().update_state(DropDownMessage::OpenState(false));
-                } else {
-                    self.id().request_layout();
-                    self.id().update_state(DropDownMessage::OpenState(true));
-                }
+            crate::event::Event::PointerDown(_) => self.swap_state(),
+            crate::event::Event::KeyUp(ref key_event)
+                if key_event.key.logical_key == Key::Named(NamedKey::Enter) =>
+            {
+                self.swap_state()
             }
             _ => {}
         }
@@ -146,7 +140,7 @@ impl<T: 'static> View for DropDown<T> {
 
 pub fn dropdown<MF, I, T, V2, AIF>(main_view: MF, iterator: I, active_item: AIF) -> DropDown<T>
 where
-    MF: Fn(T) -> Box<dyn View> + 'static,
+    MF: Fn(T) -> AnyView + 'static,
     I: IntoIterator<Item = V2> + Clone + 'static,
     V2: View + 'static,
     T: Clone + 'static,
@@ -156,11 +150,11 @@ where
 
     let list_view = Rc::new(move || {
         let iterator = iterator.clone();
-        Box::new(list(iterator)) as Box<dyn View>
+        list(iterator).any().keyboard_navigatable()
     });
 
     let initial = create_updater(active_item, move |new_state| {
-        dropdown_id.update_state(DropDownMessage::ActiveElement(Box::new(new_state)));
+        dropdown_id.update_state(Message::ActiveElement(Box::new(new_state)));
     });
 
     let main_fn = Box::new(as_child_of_current_scope(main_view));
@@ -169,16 +163,14 @@ where
 
     DropDown {
         view_data: ViewData::new(dropdown_id),
-        main_view: Box::new(child),
+        main_view: Box::new(child.build()),
         main_view_scope,
         main_fn,
         list_view,
         list_style: Style::new(),
         overlay_id: None,
         window_origin: None,
-        size: Size::ZERO,
     }
-    .keyboard_navigatable()
     .class(DropDownClass)
 }
 
@@ -187,9 +179,53 @@ impl<T> DropDown<T> {
         let id = self.id();
         create_effect(move |_| {
             let state = show();
-            id.update_state(DropDownMessage::OpenState(state));
+            id.update_state(Message::OpenState(state));
         });
         self
+    }
+
+    fn swap_state(&self) {
+        if self.overlay_id.is_some() {
+            self.id().update_state(Message::OpenState(false));
+        } else {
+            self.id().request_layout();
+            self.id().update_state(Message::OpenState(true));
+        }
+    }
+
+    fn open_dropdown(&mut self, cx: &mut crate::context::UpdateCx) {
+        if self.overlay_id.is_none() {
+            if let Some(layout) = cx.app_state.get_layout(self.id()) {
+                self.update_list_style(layout.size.width as f64);
+                let point =
+                    self.window_origin.unwrap_or_default() + (0., layout.size.height as f64);
+                self.create_overlay(point);
+            }
+        }
+    }
+
+    fn close_dropdown(&mut self) {
+        if let Some(id) = self.overlay_id.take() {
+            remove_overlay(id);
+        }
+    }
+
+    fn update_list_style(&mut self, width: f64) {
+        if let PxPctAuto::Pct(pct) = self.list_style.get(Width) {
+            let new_width = width * pct / 100.0;
+            self.list_style = self.list_style.clone().width(new_width);
+        }
+    }
+
+    fn create_overlay(&mut self, point: Point) {
+        let list = self.list_view.clone();
+        let list_style = self.list_style.clone();
+        self.overlay_id = Some(add_overlay(point, move |_| {
+            let list = list().style(move |s| s.apply(list_style.clone())).build();
+            let list_id = list.view_data().id;
+            list_id.request_focus();
+            list
+        }));
     }
 }
 
