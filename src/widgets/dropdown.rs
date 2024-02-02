@@ -6,7 +6,9 @@ use kurbo::{Point, Rect};
 use crate::{
     action::{add_overlay, remove_overlay},
     id::Id,
+    style::{Style, Width},
     style_class,
+    unit::PxPctAuto,
     view::{default_compute_layout, default_event, View, ViewData},
     views::{dyn_container, Decorators},
 };
@@ -20,6 +22,7 @@ pub struct DropDown {
     view_data: ViewData,
     main_view: Box<dyn View>,
     list_view: Rc<dyn Fn() -> Box<dyn View>>,
+    list_style: Style,
     overlay_id: Option<Id>,
     window_origin: Option<Point>,
     layout_rect: Option<Rect>,
@@ -49,10 +52,27 @@ impl View for DropDown {
         for_each(&mut self.main_view);
     }
 
+    fn style(&mut self, cx: &mut crate::context::StyleCx<'_>) {
+        let style = cx.style();
+        self.list_style = style.clone().apply_class(DropDownListClass);
+
+        self.for_each_child_mut(&mut |child| {
+            cx.style_view(child);
+            false
+        });
+    }
+
     fn compute_layout(&mut self, cx: &mut crate::context::ComputeLayoutCx) -> Option<Rect> {
-        self.window_origin = Some(cx.window_origin);
         let layout_rect = default_compute_layout(self, cx);
+        self.window_origin = Some(cx.window_origin);
         self.layout_rect = layout_rect;
+
+        if self.list_style.get(Width) == PxPctAuto::Auto {
+            self.list_style = self
+                .list_style
+                .clone()
+                .width(layout_rect.unwrap_or_default().width());
+        }
         layout_rect
     }
 
@@ -63,8 +83,9 @@ impl View for DropDown {
                     let layout = self.layout_rect.unwrap_or_default();
                     let point = self.window_origin.unwrap_or_default() + (0., layout.height());
                     let list = self.list_view.clone();
+                    let list_style = self.list_style.clone();
                     self.overlay_id = Some(add_overlay(point, move |_| {
-                        list().style(move |s| s.width(layout.width()))
+                        list().style(move |s| s.apply(list_style.clone()))
                     }));
                 }
             } else if let Some(id) = self.overlay_id {
@@ -83,17 +104,11 @@ impl View for DropDown {
         #[allow(clippy::single_match)]
         match event {
             crate::event::Event::PointerDown(_) => {
-                if let Some(id) = self.overlay_id {
-                    remove_overlay(id);
-                    self.overlay_id = None;
+                if self.overlay_id.is_some() {
+                    self.id().update_state(false);
                 } else {
-                    let layout = self.layout_rect.unwrap();
-                    let point = self.window_origin.unwrap_or_default() + (0., layout.height());
-
-                    let list = self.list_view.clone();
-                    self.overlay_id = Some(add_overlay(point, move |_| {
-                        list().style(move |s| s.width(layout.width()))
-                    }));
+                    self.id().request_layout();
+                    self.id().update_state(true)
                 }
             }
             _ => {}
@@ -113,7 +128,7 @@ where
 {
     let list_view = Rc::new(move || {
         let iterator = iterator.clone();
-        Box::new(list(iterator).class(DropDownListClass)) as Box<dyn View>
+        Box::new(list(iterator)) as Box<dyn View>
     });
 
     let main_view = dyn_container(active_item, move |item| {
@@ -125,6 +140,7 @@ where
         view_data: ViewData::new(Id::next()),
         main_view: Box::new(main_view),
         list_view,
+        list_style: Style::new(),
         overlay_id: None,
         window_origin: None,
         layout_rect: None,

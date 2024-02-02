@@ -1013,7 +1013,7 @@ pub struct StyleCx<'a> {
     pub(crate) now: Instant,
     saved_disabled: Vec<bool>,
     saved_selected: Vec<bool>,
-    disabled: bool,
+    pub(crate) disabled: bool,
     selected: bool,
 }
 
@@ -1038,7 +1038,7 @@ impl<'a> StyleCx<'a> {
         self.selected = true;
     }
 
-    fn get_interact_state(&self, id: &Id) -> InteractionState {
+    pub(crate) fn get_interact_state(&self, id: &Id) -> InteractionState {
         InteractionState {
             is_selected: self.selected,
             is_hovered: self.app_state.is_hovered(id),
