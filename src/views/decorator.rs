@@ -262,11 +262,12 @@ pub trait Decorators: View + Sized {
         self
     }
 
-    fn request_focus(self, when: impl Fn() + 'static) -> Self {
+    fn request_focus(self, when: impl Fn() -> bool + 'static) -> Self {
         let id = self.id();
         create_effect(move |_| {
-            when();
-            id.request_focus();
+            if when() {
+                id.request_focus();
+            }
         });
         self
     }
