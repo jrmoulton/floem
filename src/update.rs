@@ -68,11 +68,6 @@ pub(crate) enum UpdateMessage {
     Draggable {
         id: Id,
     },
-    EventListener {
-        id: Id,
-        listener: EventListener,
-        action: Box<EventCallback>,
-    },
     ResizeListener {
         id: Id,
         action: Box<ResizeCallback>,

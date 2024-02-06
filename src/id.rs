@@ -178,14 +178,6 @@ impl Id {
         self.add_update_message(UpdateMessage::Draggable { id: *self });
     }
 
-    pub fn update_event_listener(&self, listener: EventListener, action: Box<EventCallback>) {
-        self.add_update_message(UpdateMessage::EventListener {
-            id: *self,
-            listener,
-            action,
-        });
-    }
-
     pub fn update_resize_listener(&self, action: Box<ResizeCallback>) {
         self.add_update_message(UpdateMessage::ResizeListener { id: *self, action });
     }

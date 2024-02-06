@@ -11,6 +11,7 @@ use crate::{
         LayoutProps, Outline, OutlineColor, Style, StyleClassRef, StyleSelectors,
     },
     view::Widget,
+    EventPropagation,
 };
 use bitflags::bitflags;
 use kurbo::Rect;
@@ -64,7 +65,7 @@ impl<T> Stack<T> {
 pub struct ViewData {
     pub(crate) id: Id,
     pub(crate) style: Stack<Style>,
-    pub(crate) event_handlers: Vec<Box<EventCallback>>,
+    pub(crate) event_handlers: HashMap<EventListener, Vec<Box<EventCallback>>>,
 }
 
 impl ViewData {
@@ -85,6 +86,26 @@ impl ViewData {
             result.apply_mut(entry.clone());
         }
         result
+    }
+
+    pub(crate) fn apply_event(
+        &self,
+        listener: &EventListener,
+        event: &crate::event::Event,
+    ) -> Option<EventPropagation> {
+        let mut handled = false;
+        if let Some(handlers) = self.event_handlers.get(listener) {
+            for handler in handlers {
+                handled |= handler(event).is_processed();
+            }
+        } else {
+            return None;
+        }
+        if handled {
+            Some(EventPropagation::Stop)
+        } else {
+            Some(EventPropagation::Continue)
+        }
     }
 }
 
@@ -151,7 +172,6 @@ pub struct ViewState {
     pub(crate) dragging_style: Option<Style>,
     pub(crate) combined_style: Style,
     pub(crate) taffy_style: taffy::style::Style,
-    pub(crate) event_listeners: HashMap<EventListener, Box<EventCallback>>,
     pub(crate) context_menu: Option<Box<MenuCallback>>,
     pub(crate) popout_menu: Option<Box<MenuCallback>>,
     pub(crate) resize_listener: Option<ResizeListener>,
@@ -176,7 +196,6 @@ impl ViewState {
             combined_style: Style::new(),
             taffy_style: taffy::style::Style::DEFAULT,
             dragging_style: None,
-            event_listeners: HashMap::new(),
             context_menu: None,
             popout_menu: None,
             resize_listener: None,

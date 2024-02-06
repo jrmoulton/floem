@@ -88,7 +88,11 @@ pub trait Decorators: View + Sized {
         action: impl Fn(&Event) -> EventPropagation + 'static,
     ) -> Self {
         let id = self.id();
-        id.update_event_listener(listener, Box::new(action));
+        self.view_data_mut()
+            .event_handlers
+            .entry(listener)
+            .and_modify(|stack| stack.push(Box::new(action)))
+            .or_insert(vec![Box::new(action)]);
         self
     }
 
@@ -101,15 +105,20 @@ pub trait Decorators: View + Sized {
         modifiers: ModifiersState,
         action: impl Fn(&Event) + 'static,
     ) -> Self {
-        self.view_data_mut().event_handlers.push(Box::new(move |e| {
+        let func = Box::new(move |&e| {
             if let Event::KeyDown(ke) = e {
                 if ke.key.logical_key == key && ke.modifiers == modifiers {
-                    action(e);
+                    action(&e);
                     return EventPropagation::Stop;
                 }
             }
             EventPropagation::Continue
-        }));
+        });
+        self.view_data_mut()
+            .event_handlers
+            .entry(EventListener::KeyDown)
+            .and_modify(|stack| stack.push(func))
+            .or_insert(vec![func]);
         self
     }
 
@@ -122,15 +131,20 @@ pub trait Decorators: View + Sized {
         modifiers: ModifiersState,
         action: impl Fn(&Event) + 'static,
     ) -> Self {
-        self.view_data_mut().event_handlers.push(Box::new(move |e| {
+        let func = Box::new(move |&e| {
             if let Event::KeyUp(ke) = e {
                 if ke.key.logical_key == key && ke.modifiers == modifiers {
-                    action(e);
+                    action(&e);
                     return EventPropagation::Stop;
                 }
             }
             EventPropagation::Continue
-        }));
+        });
+        self.view_data_mut()
+            .event_handlers
+            .entry(EventListener::KeyDown)
+            .and_modify(|stack| stack.push(func))
+            .or_insert(vec![func]);
         self
     }
 
@@ -155,7 +169,11 @@ pub trait Decorators: View + Sized {
     /// Add an event handler for [EventListener::Click].
     fn on_click(self, action: impl Fn(&Event) -> EventPropagation + 'static) -> Self {
         let id = self.id();
-        id.update_event_listener(EventListener::Click, Box::new(action));
+        self.view_data_mut()
+            .event_handlers
+            .entry(EventListener::KeyDown)
+            .and_modify(|stack| stack.push(Box::new(action)))
+            .or_insert(vec![Box::new(action)]);
         self
     }
 
@@ -179,8 +197,11 @@ pub trait Decorators: View + Sized {
 
     /// Add an event handler for [EventListener::DoubleClick]
     fn on_double_click(self, action: impl Fn(&Event) -> EventPropagation + 'static) -> Self {
-        let id = self.id();
-        id.update_event_listener(EventListener::DoubleClick, Box::new(action));
+        self.view_data_mut()
+            .event_handlers
+            .entry(EventListener::KeyDown)
+            .and_modify(|stack| stack.push(Box::new(action)))
+            .or_insert(vec![Box::new(action)]);
         self
     }
 
@@ -205,7 +226,11 @@ pub trait Decorators: View + Sized {
     /// Add an event handler for [EventListener::SecondaryClick]. This is most often the "Right" click.
     fn on_secondary_click(self, action: impl Fn(&Event) -> EventPropagation + 'static) -> Self {
         let id = self.id();
-        id.update_event_listener(EventListener::SecondaryClick, Box::new(action));
+        self.view_data_mut()
+            .event_handlers
+            .entry(EventListener::KeyDown)
+            .and_modify(|stack| stack.push(Box::new(action)))
+            .or_insert(vec![Box::new(action)]);
         self
     }
 

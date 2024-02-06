@@ -199,18 +199,16 @@ impl WindowHandle {
                 }
 
                 if !processed {
-                    for handler in &self.view.main.view_data().event_handlers {
-                        if (handler)(&event).is_processed() {
-                            processed = true;
-                            break;
-                        }
-                    }
-
                     if let Some(listener) = event.listener() {
-                        if let Some(action) =
-                            cx.get_event_listener(self.view.main.view_data().id(), &listener)
+                        if let Some(handlers) =
+                            &self.view.main.view_data().event_handlers.get(&listener)
                         {
-                            processed |= (*action)(&event).is_processed();
+                            for handler in *handlers {
+                                if (handler)(&event).is_processed() {
+                                    processed = true;
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
@@ -296,8 +294,16 @@ impl WindowHandle {
                     cx.app_state.request_style_recursive(*id);
                 }
                 if hovered.contains(id) {
-                    if let Some(action) = cx.get_event_listener(*id, &EventListener::PointerEnter) {
-                        (*action)(&event);
+                    if let Some(handlers) = self
+                        .view
+                        .main
+                        .view_data_mut()
+                        .event_handlers
+                        .get(&EventListener::PointerEnter)
+                    {
+                        for handler in handlers {
+                            (*handler)(&event);
+                        }
                     }
                 } else {
                     let id_path = ID_PATHS.with(|paths| paths.borrow().get(id).cloned());
@@ -316,11 +322,27 @@ impl WindowHandle {
                 .symmetric_difference(dragging_over)
             {
                 if dragging_over.contains(id) {
-                    if let Some(action) = cx.get_event_listener(*id, &EventListener::DragEnter) {
-                        (*action)(&event);
+                    if let Some(handlers) = self
+                        .view
+                        .main
+                        .view_data_mut()
+                        .event_handlers
+                        .get(&EventListener::DragEnter)
+                    {
+                        for handler in handlers {
+                            (*handler)(&event);
+                        }
                     }
-                } else if let Some(action) = cx.get_event_listener(*id, &EventListener::DragLeave) {
-                    (*action)(&event);
+                } else if let Some(handlers) = self
+                    .view
+                    .main
+                    .view_data_mut()
+                    .event_handlers
+                    .get(&EventListener::DragLeave)
+                {
+                    for handler in handlers {
+                        (*handler)(&event);
+                    }
                 }
             }
         }
@@ -869,14 +891,6 @@ impl WindowHandle {
                                 floem_winit::dpi::LogicalPosition::new(pos.x, pos.y),
                             ));
                         }
-                    }
-                    UpdateMessage::EventListener {
-                        id,
-                        listener,
-                        action,
-                    } => {
-                        let state = cx.app_state.view_state(id);
-                        state.event_listeners.insert(listener, action);
                     }
                     UpdateMessage::ResizeListener { id, action } => {
                         let state = cx.app_state.view_state(id);

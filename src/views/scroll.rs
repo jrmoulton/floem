@@ -857,10 +857,14 @@ impl Widget for Scroll {
 
         if let Event::PointerWheel(pointer_event) = &event {
             if let Some(listener) = event.listener() {
-                if let Some(action) = cx.get_event_listener(self.id(), &listener) {
-                    if (*action)(&event).is_processed() {
-                        return EventPropagation::Stop;
+                let mut processed = false;
+                if let Some(handlers) = self.data.event_handlers.get(&listener) {
+                    for handler in handlers {
+                        processed |= (*handler)(&event).is_processed();
                     }
+                }
+                if processed {
+                    return EventPropagation::Stop;
                 }
             }
             let delta = pointer_event.delta;

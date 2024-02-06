@@ -495,16 +495,6 @@ impl AppState {
         }
     }
 
-    pub(crate) fn get_event_listener(
-        &self,
-        id: Id,
-        listener: &EventListener,
-    ) -> Option<&impl Fn(&Event) -> EventPropagation> {
-        self.view_states
-            .get(&id)
-            .and_then(|s| s.event_listeners.get(listener))
-    }
-
     pub(crate) fn focus_changed(&mut self, old: Option<Id>, new: Option<Id>) {
         if let Some(id) = new {
             // To apply the styles of the Focus selector
@@ -688,12 +678,19 @@ impl<'a> EventCx<'a> {
                             self.app_state.update_focus(id, false);
                         }
                         if event.count == 2
-                            && self.has_event_listener(id, EventListener::DoubleClick)
+                            && view
+                                .view_data()
+                                .event_handlers
+                                .contains_key(&EventListener::DoubleClick)
                         {
                             let view_state = self.app_state.view_state(id);
                             view_state.last_pointer_down = Some(event.clone());
                         }
-                        if self.has_event_listener(id, EventListener::Click) {
+                        if view
+                            .view_data()
+                            .event_handlers
+                            .contains_key(&EventListener::Click)
+                        {
                             let view_state = self.app_state.view_state(id);
                             view_state.last_pointer_down = Some(event.clone());
                         }
@@ -721,7 +718,11 @@ impl<'a> EventCx<'a> {
                             // if the view can be focused, we update the focus
                             self.app_state.update_focus(id, false);
                         }
-                        if self.has_event_listener(id, EventListener::SecondaryClick) {
+                        if view
+                            .view_data()
+                            .event_handlers
+                            .contains_key(&EventListener::SecondaryClick)
+                        {
                             let view_state = self.app_state.view_state(id);
                             view_state.last_pointer_down = Some(event.clone());
                         }
@@ -733,10 +734,9 @@ impl<'a> EventCx<'a> {
                 if rect.contains(pointer_event.pos) {
                     if self.app_state.is_dragging() {
                         self.app_state.dragging_over.insert(id);
-                        if let Some(action) = self.get_event_listener(id, &EventListener::DragOver)
-                        {
-                            (*action)(&event);
-                        }
+
+                        view.view_data()
+                            .apply_event(&EventListener::DragOver, &event);
                     } else {
                         self.app_state.hovered.insert(id);
                         let style = self.app_state.get_builtin_style(id);
@@ -775,18 +775,17 @@ impl<'a> EventCx<'a> {
                                 released_at: None,
                             });
                             id.request_paint();
-                            if let Some(action) =
-                                self.get_event_listener(id, &EventListener::DragStart)
-                            {
-                                (*action)(&event);
-                            }
+                            view.view_data()
+                                .apply_event(&EventListener::DragStart, &event);
                         }
                     }
                 }
-                if let Some(action) = self.get_event_listener(id, &EventListener::PointerMove) {
-                    if (*action)(&event).is_processed() {
-                        return EventPropagation::Stop;
-                    }
+                if view
+                    .view_data()
+                    .apply_event(&EventListener::PointerMove, &event)
+                    .is_some_and(|prop| prop.is_processed())
+                {
+                    return EventPropagation::Stop;
                 }
             }
             Event::PointerUp(pointer_event) => {
@@ -798,21 +797,19 @@ impl<'a> EventCx<'a> {
                         if on_view {
                             if let Some(dragging) = self.app_state.dragging.as_mut() {
                                 let dragging_id = dragging.id;
-                                if let Some(action) =
-                                    self.get_event_listener(id, &EventListener::Drop)
+
+                                if view
+                                    .view_data()
+                                    .apply_event(&EventListener::Drop, &event)
+                                    .is_some_and(|prop| prop.is_processed())
                                 {
-                                    if (*action)(&event).is_processed() {
-                                        // if the drop is processed, we set dragging to none so that the animation
-                                        // for the dragged view back to its original position isn't played.
-                                        self.app_state.dragging = None;
-                                        id.request_paint();
-                                        if let Some(action) = self.get_event_listener(
-                                            dragging_id,
-                                            &EventListener::DragEnd,
-                                        ) {
-                                            (*action)(&event);
-                                        }
-                                    }
+                                    // if the drop is processed, we set dragging to none so that the animation
+                                    // for the dragged view back to its original position isn't played.
+                                    self.app_state.dragging = None;
+                                    id.request_paint();
+
+                                    view.view_data()
+                                        .apply_event(&EventListener::DragEnd, &event);
                                 }
                             }
                         }
@@ -822,15 +819,16 @@ impl<'a> EventCx<'a> {
                         let dragging_id = dragging.id;
                         dragging.released_at = Some(std::time::Instant::now());
                         id.request_paint();
-                        if let Some(action) =
-                            self.get_event_listener(dragging_id, &EventListener::DragEnd)
-                        {
-                            (*action)(&event);
-                        }
+                        view.view_data()
+                            .apply_event(&EventListener::DragEnd, &event);
                     }
 
                     let last_pointer_down = self.app_state.view_state(id).last_pointer_down.take();
-                    if let Some(action) = self.get_event_listener(id, &EventListener::DoubleClick) {
+                    if view
+                        .view_data()
+                        .event_handlers
+                        .contains_key(&EventListener::DoubleClick)
+                    {
                         if on_view
                             && self.app_state.is_clicking(&id)
                             && last_pointer_down
@@ -930,22 +928,6 @@ impl<'a> EventCx<'a> {
         self.app_state
             .get_layout(id)
             .map(|l| Size::new(l.size.width as f64, l.size.height as f64))
-    }
-
-    pub(crate) fn has_event_listener(&self, id: Id, listener: EventListener) -> bool {
-        self.app_state
-            .view_states
-            .get(&id)
-            .map(|s| s.event_listeners.contains_key(&listener))
-            .unwrap_or(false)
-    }
-
-    pub(crate) fn get_event_listener(
-        &self,
-        id: Id,
-        listener: &EventListener,
-    ) -> Option<&impl Fn(&Event) -> EventPropagation> {
-        self.app_state.get_event_listener(id, listener)
     }
 
     /// translate a window-positioned event to the local coordinate system of a view
