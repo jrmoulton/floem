@@ -30,16 +30,19 @@ impl Id {
             let mut children = runtime.children.borrow_mut();
             let children = children.entry(*scope).or_default();
             children.insert(*self);
+            let mut parents = runtime.parents.borrow_mut();
+            parents.insert(*self, *scope);
         });
     }
 
     /// Dispose the relevant resources that's linking to this Id, and the all the children
     /// and grandchildren.
     pub(crate) fn dispose(&self) {
-        if let Ok((children, signal)) = RUNTIME.try_with(|runtime| {
+        if let Ok((children, signal, _)) = RUNTIME.try_with(|runtime| {
             (
                 runtime.children.borrow_mut().remove(self),
                 runtime.signals.borrow_mut().remove(self),
+                runtime.parents.borrow_mut().remove(self),
             )
         }) {
             if let Some(children) = children {

@@ -49,6 +49,8 @@ impl Scope {
             let mut children = runtime.children.borrow_mut();
             let children = children.entry(self.0).or_default();
             children.insert(child);
+            let mut parents = runtime.parents.borrow_mut();
+            parents.insert(child, self.0);
         });
         Scope(child)
     }

@@ -23,8 +23,9 @@ pub(crate) struct Runtime {
     pub(crate) current_effect: RefCell<Option<Rc<dyn EffectTrait>>>,
     pub(crate) current_scope: RefCell<Id>,
     pub(crate) children: RefCell<HashMap<Id, HashSet<Id>>>,
+    pub(crate) parents: RefCell<HashMap<Id, Id>>,
     pub(crate) signals: RefCell<HashMap<Id, Signal>>,
-    pub(crate) contexts: RefCell<HashMap<TypeId, Box<dyn Any>>>,
+    pub(crate) contexts: RefCell<HashMap<Id, HashMap<TypeId, Box<dyn Any>>>>,
     pub(crate) batching: Cell<bool>,
     pub(crate) pending_effects: RefCell<SmallVec<[Rc<dyn EffectTrait>; 10]>>,
 }
@@ -43,6 +44,7 @@ impl Runtime {
             children: RefCell::new(HashMap::new()),
             signals: Default::default(),
             contexts: Default::default(),
+            parents: Default::default(),
             batching: Cell::new(false),
             pending_effects: RefCell::new(SmallVec::new()),
         }
