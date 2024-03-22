@@ -5,7 +5,7 @@ use crate::{
     id::Id,
     style::{Style, StyleClassRef},
     view::{View, ViewData, Widget},
-    view_tuple::ViewTuple,
+    view_tuple::IntoWidgets,
 };
 
 /// A collection of static views. See [`stack`] and [`stack_from_iter`].
@@ -33,7 +33,7 @@ pub struct Stack {
 ///     )),
 /// ));
 /// ```
-pub fn stack<VT: ViewTuple + 'static>(children: VT) -> Stack {
+pub fn stack<VT: IntoWidgets + 'static>(children: VT) -> Stack {
     Stack {
         data: ViewData::new(Id::next()),
         children: children.into_widgets(),
@@ -42,7 +42,7 @@ pub fn stack<VT: ViewTuple + 'static>(children: VT) -> Stack {
 }
 
 /// A stack which defaults to `FlexDirection::Row`. See also [`v_stack`].
-pub fn h_stack<VT: ViewTuple + 'static>(children: VT) -> Stack {
+pub fn h_stack<VT: IntoWidgets + 'static>(children: VT) -> Stack {
     Stack {
         data: ViewData::new(Id::next()),
         children: children.into_widgets(),
@@ -51,7 +51,7 @@ pub fn h_stack<VT: ViewTuple + 'static>(children: VT) -> Stack {
 }
 
 /// A stack which defaults to `FlexDirection::Column`. See also [`h_stack`].
-pub fn v_stack<VT: ViewTuple + 'static>(children: VT) -> Stack {
+pub fn v_stack<VT: IntoWidgets + 'static>(children: VT) -> Stack {
     Stack {
         data: ViewData::new(Id::next()),
         children: children.into_widgets(),
@@ -181,5 +181,9 @@ impl Stack {
             child.view_data().id().add_class(style_class);
         }
         self
+    }
+
+    pub fn flatten(self) -> Vec<Box<dyn Widget>> {
+        self.children
     }
 }

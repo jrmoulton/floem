@@ -406,16 +406,22 @@ impl AppState {
         let rect = Size::new(size.width as f64, size.height as f64).to_rect();
         let view_state = self.view_state(id);
         let props = &view_state.layout_props;
+
         let pixels = |px_pct, abs| match px_pct {
             PxPct::Px(v) => v,
             PxPct::Pct(pct) => pct * abs,
         };
-        rect.inset(-Insets {
-            x0: props.border_left().0 + pixels(props.padding_left(), rect.width()),
-            x1: props.border_right().0 + pixels(props.padding_right(), rect.width()),
-            y0: props.border_top().0 + pixels(props.padding_top(), rect.height()),
-            y1: props.border_bottom().0 + pixels(props.padding_bottom(), rect.height()),
-        })
+
+        // Compute the insets by adding border and padding for each side.
+        let insets = Insets {
+            x0: pixels(props.padding_left(), rect.width()) + props.border_left().0,
+            y0: pixels(props.padding_top(), rect.height()) + props.border_top().0,
+            x1: pixels(props.padding_right(), rect.width()) + props.border_right().0,
+            y1: pixels(props.padding_bottom(), rect.height()) + props.border_bottom().0,
+        };
+
+        // Apply the insets to decrease the rect size based on padding and border.
+        rect.inset(insets)
     }
 
     pub(crate) fn get_layout_rect(&mut self, id: Id) -> Rect {
