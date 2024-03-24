@@ -2,11 +2,11 @@ use floem::{
     cosmic_text::Weight,
     unit::UnitExt,
     view::View,
-    view_tuple::ViewTuple,
+    view_tuple::IntoWidgets,
     views::{container, label, stack, Decorators},
 };
 
-pub fn form<VT: ViewTuple + 'static>(children: VT) -> impl View {
+pub fn form<VT: IntoWidgets + 'static>(children: VT) -> impl View {
     stack(children).style(|s| {
         s.flex_col()
             .items_start()
