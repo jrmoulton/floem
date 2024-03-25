@@ -55,7 +55,7 @@ use self::{
     layout::TextLayoutLine,
     phantom_text::PhantomTextLine,
     text::{Document, Preedit, PreeditData, RenderWhitespace, Styling, WrapMethod},
-    view::{EditorStyle, LineInfo, ScreenLines, ScreenLinesBase},
+    view::{LineInfo, ScreenLines, ScreenLinesBase},
     visual_line::{
         hit_position_aff, ConfigId, FontSizeCacheId, LayoutEvent, LineFontSizeProvider, Lines,
         RVLine, ResolvedWrap, TextLayoutProvider, VLine, VLineInfo,
@@ -71,11 +71,7 @@ impl StylePropValue for WrapMethod {
 prop!(pub CursorSurroundingLines: usize {} = 1);
 prop!(pub ScrollBeyondLastLine: bool {} = false);
 prop!(pub ShowIndentGuide: bool {} = false);
-prop!(pub Modal: bool {} = false);
-prop!(pub ModalRelativeLine: bool {} = false);
-prop!(pub SmartTab: bool {} = false);
 prop!(pub PhantomColor: Color {} = Color::DIM_GRAY);
-prop!(pub PlaceholderColor: Color {} = Color::DIM_GRAY);
 prop!(pub PreeditUnderlineColor: Color {} = Color::WHITE);
 prop!(pub RenderWhiteSpaceProp: RenderWhitespace {} = RenderWhitespace::None);
 impl StylePropValue for RenderWhitespace {
@@ -88,23 +84,12 @@ prop_extractor! {
     pub EditorStyle {
         pub text_color: TextColor,
         pub phantom_color: PhantomColor,
-        pub placeholder_color: PlaceholderColor,
         pub preedit_underline_color: PreeditUnderlineColor,
         pub show_indent_guide: ShowIndentGuide,
-        pub modal: Modal,
-        // Whether line numbers are relative in modal mode
-        pub modal_ralative_line: Modal,
-        // Whether to insert the indent that is detected for the file when a tab character
-        // is inputted.
-        pub smart_tab: SmartTab,
         pub wrap_method: WrapProp,
         pub cursor_surounding_lines: CursorSurroundingLines,
+        scroll_beyond_last_line: ScrollBeyondLastLine,
         pub render_white_space: RenderWhiteSpaceProp,
-    }
-}
-impl EditorStyle {
-    fn ed_text_color(&self) -> Color {
-        self.text_color().unwrap_or(Color::BLACK)
     }
 }
 
