@@ -126,6 +126,13 @@ impl Id {
         self.add_update_message(UpdateMessage::RequestPaint);
     }
 
+    pub fn request_style(&self) {
+        self.add_update_message(UpdateMessage::RequestChange {
+            id: *self,
+            flags: ChangeFlags::STYLE,
+        });
+    }
+
     pub fn request_layout(&self) {
         self.add_update_message(UpdateMessage::RequestChange {
             id: *self,

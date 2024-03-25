@@ -11,7 +11,7 @@ use std::{
 use lapce_xi_rope::{
     multiset::Subset,
     tree::{Node, NodeInfo},
-    Delta, DeltaBuilder, DeltaElement, Interval, Rope, RopeDelta,
+    Delta, DeltaBuilder, DeltaElement, Interval, RopeDelta,
 };
 
 use crate::{

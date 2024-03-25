@@ -1,10 +1,9 @@
 use floem::cosmic_text::{Attrs, AttrsList, Stretch, Style, Weight};
 use floem::peniko::Color;
-use floem::reactive::RwSignal;
 use floem::views::editor::core::buffer::rope_text::RopeText;
 use floem::views::editor::id::EditorId;
 use floem::views::editor::layout::TextLayoutLine;
-use floem::views::editor::text::{default_dark_color, Document, SimpleStylingBuilder, Styling};
+use floem::views::editor::text::{Document, SimpleStylingBuilder, Styling};
 use floem::{
     cosmic_text::FamilyOwned,
     keyboard::{Key, ModifiersState, NamedKey},
@@ -226,7 +225,8 @@ mod tests {
                 );
             }),
             button(|| "Gutter").on_click_stop(move |_| {
-                hide_gutter.update(|hide| *hide = !*hide);
+                // let a = !gutter.get_untracked();
+                // gutter.set(a);
             }),
         ))
         .style(|s| s.width_full().flex_row().items_center().justify_center()),

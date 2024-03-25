@@ -8,7 +8,7 @@ use kurbo::{Circle, Point, RoundedRect};
 
 use crate::{
     prop, prop_extractor,
-    style::{Background, BorderRadius, Foreground, Height, Style, StylePropValue, StyleValue},
+    style::{Background, BorderRadius, Foreground, Height, Style, StyleValue},
     style_class,
     unit::{PxPct, PxPctAuto},
     view::{View, ViewData, Widget},

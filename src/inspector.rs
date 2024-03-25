@@ -53,6 +53,7 @@ impl CapturedView {
         let state = app_state.view_state(id);
         let clipped = layout.intersect(clip);
         let custom_name = &view.view_data().debug_name;
+        let classes = state.classes.clone();
         let name = custom_name
             .iter()
             .chain(std::iter::once(&view.debug_name().to_string()))
@@ -645,7 +646,8 @@ fn selected_view(capture: &Rc<Capture>, selected: RwSignal<Option<Id>>) -> AnyVi
                     style_header,
                     style_list,
                     class_header,
-                    v_stack_from_iter(class_list.iter().map(text)).style(|s| s.gap(10, 10)),
+                    v_stack_from_iter(class_list.iter().map(|val| text(val)))
+                        .style(|s| s.gap(10, 10)),
                 ))
                 .style(|s| s.width_full())
                 .any()

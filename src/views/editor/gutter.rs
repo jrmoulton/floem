@@ -10,33 +10,22 @@ use crate::{
     views::Decorators,
     Renderer,
 };
-use floem_editor_core::{cursor::CursorMode, mode::Mode};
+use floem_editor_core::mode::Mode;
 use floem_peniko::Color;
 use floem_reactive::RwSignal;
 use kurbo::Rect;
 
-use super::{view::CurrentLineColor, Editor};
+use super::Editor;
 
 prop!(pub LeftOfCenterPadding: f64 {} = 25.);
 prop!(pub RightOfCenterPadding: f64 {} = 30.);
-prop!(pub DimColor: Option<Color> {} = None);
 
 prop_extractor! {
     GutterStyle {
-        accent_color: TextColor,
-        dim_color: DimColor,
+        text_color: TextColor,
         left_padding: LeftOfCenterPadding,
         right_padding: RightOfCenterPadding,
-        current_line_color: CurrentLineColor,
-    }
-}
-impl GutterStyle {
-    fn gs_accent_color(&self) -> Color {
-        self.accent_color().unwrap_or(Color::BLACK)
-    }
-
-    fn gs_dim_color(&self) -> Color {
-        self.dim_color().unwrap_or(self.gs_accent_color())
+        // foreground: Foreground
     }
 }
 
@@ -160,12 +149,14 @@ impl Widget for EditorGutterView {
         let dim_color = self.gutter_style.gs_dim_color();
         let attrs = Attrs::new()
             .family(&family)
-            .color(dim_color)
+            .color(self.gutter_style.text_color().unwrap_or(Color::BLACK))
             .font_size(style.font_size(edid, 0) as f32);
         let attrs_list = AttrsList::new(attrs);
-        let current_line_attrs_list = AttrsList::new(attrs.color(accent_color));
-        let show_relative = editor.es.with_untracked(|es| es.modal())
-            && editor.es.with_untracked(|es| es.modal_ralative_line())
+        // TODO: jrmoulton -> why was this foreground used here? It just overrode the dim color above
+        // let current_line_attrs_list = AttrsList::new(attrs.color(self.gutter_style.foreground()));
+        let current_line_attrs_list = AttrsList::new(attrs);
+        let show_relative = editor.modal.get_untracked()
+            && editor.modal_relative_line_numbers.get_untracked()
             && mode != Mode::Insert;
 
         self.text_width = self.compute_widest_text_width(&attrs_list);

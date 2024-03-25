@@ -11,11 +11,15 @@ use crate::{
     peniko::Color,
     prop, prop_extractor,
     reactive::{batch, create_effect, create_memo, create_rw_signal, Memo, RwSignal, Scope},
-    style::{CursorStyle, Style, StylePropValue},
+    style::{CursorStyle, Style, StylePropValue, TextColor},
     style_class,
     taffy::tree::NodeId,
     view::{AnyView, AnyWidget, View, ViewData, Widget},
-    views::{clip, container, empty, scroll, stack, text, Decorators},
+    views::{
+        container,
+        editor::text::{RenderWhitespace, WrapMethod},
+        empty, scroll, stack, text, Decorators,
+    },
     EventPropagation, Renderer,
 };
 use floem_editor_core::{
@@ -33,7 +37,7 @@ use crate::views::editor::{
     visual_line::{RVLine, VLineInfo},
 };
 
-use super::{Editor, ScrollBeyondLastLine, CHAR_WIDTH};
+use super::{Editor, CHAR_WIDTH};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum DiffSectionKind {
@@ -336,30 +340,62 @@ impl StylePropValue for IndentStyle {
         Some(text(self).any())
     }
 }
+prop!(pub ScrollbarLine: Color {} = Color::TRANSPARENT);
 prop!(pub DropdownShadow: Option<Color> {} = None);
 prop!(pub Foreground: Color { inherited } = Color::rgb8(0x38, 0x3A, 0x42));
 prop!(pub Focus: Option<Color> {} = None);
-prop!(pub CaretColor: Color {} = Color::BLACK.with_alpha_factor(0.5));
-prop!(pub SelectionColor: Color {} = Color::BLACK.with_alpha_factor(0.5));
-prop!(pub CurrentLineColor: Option<Color> {  } = None);
+prop!(pub Caret: Color {} = Color::BLACK.with_alpha_factor(0.5));
+prop!(pub Selection: Color {} = Color::BLACK.with_alpha_factor(0.5));
+prop!(pub CurrentLine: Option<Color> {} = None);
 prop!(pub Link: Option<Color> {} = None);
-prop!(pub VisibleWhitespaceColor: Color {} = Color::TRANSPARENT);
-prop!(pub IndentGuideColor: Color {} = Color::TRANSPARENT);
+prop!(pub VisibleWhitespace: Color {} = Color::TRANSPARENT);
+prop!(pub IndentGuide: Color {} = Color::TRANSPARENT);
 prop!(pub StickyHeaderBackground: Option<Color> {} = None);
 
 prop_extractor! {
     EditorViewStyle {
         indent_style: IndentStyleProp,
+        scroll_bar: ScrollbarLine,
         // dropdown_shadow: DropdownShadow,
         // focus: Focus,
-        caret: CaretColor,
-        selection: SelectionColor,
-        current_line: CurrentLineColor,
+        caret: Caret,
+        selection: Selection,
+        current_line: CurrentLine,
         // link: Link,
-        visible_whitespace: VisibleWhitespaceColor,
-        indent_guide: IndentGuideColor,
-        scroll_beyond_last_line: ScrollBeyondLastLine,
+        visible_whitespace: VisibleWhitespace,
+        indent_guide: IndentGuide,
         // sticky_header_background: StickyHeaderBackground,
+    }
+}
+
+prop!(pub WrapProp: WrapMethod {} = WrapMethod::EditorWidth);
+impl StylePropValue for WrapMethod {
+    fn debug_view(&self) -> Option<AnyView> {
+        Some(crate::views::text(self).any())
+    }
+}
+prop!(pub CursorSurroundingLines: usize {} = 1);
+prop!(pub ScrollBeyondLastLine: bool {} = false);
+prop!(pub ShowIndentGuide: bool {} = false);
+prop!(pub PhantomColor: Color {} = Color::DIM_GRAY);
+prop!(pub PreeditUnderlineColor: Color {} = Color::WHITE);
+prop!(pub RenderWhiteSpaceProp: RenderWhitespace {} = RenderWhitespace::None);
+impl StylePropValue for RenderWhitespace {
+    fn debug_view(&self) -> Option<AnyView> {
+        Some(crate::views::text(self).any())
+    }
+}
+
+prop_extractor! {
+    pub EditorStyle {
+        pub text_color: TextColor,
+        pub phantom_color: PhantomColor,
+        pub preedit_underline_color: PreeditUnderlineColor,
+        pub show_indent_guide: ShowIndentGuide,
+        pub wrap_method: WrapProp,
+        pub cursor_surounding_lines: CursorSurroundingLines,
+        // scroll_beyond_last_line: ScrollBeyondLastLine,
+        pub render_white_space: RenderWhiteSpaceProp,
     }
 }
 
@@ -370,6 +406,7 @@ pub struct EditorView {
     is_active: Memo<bool>,
     inner_node: Option<NodeId>,
     editor_view_style: EditorViewStyle,
+    editor_style: EditorStyle,
 }
 impl EditorView {
     #[allow(clippy::too_many_arguments)]
@@ -838,7 +875,7 @@ impl EditorView {
                 }
             }
 
-            if ed.es.with(|s| s.show_indent_guide()) {
+            if ed.editor_style.with(|s| s.show_indent_guide()) {
                 let line_height = f64::from(ed.line_height(line));
                 let mut x = 0.0;
                 while x + 1.0 < text_layout.indent {
@@ -853,6 +890,22 @@ impl EditorView {
 
             cx.draw_text(&text_layout.text, Point::new(0.0, y));
         }
+    }
+
+    fn paint_scroll_bar(cx: &mut PaintCx, viewport: Rect, editor_style: &EditorViewStyle) {
+        // TODO: let this be customized
+        const BAR_WIDTH: f64 = 10.0;
+        cx.fill(
+            &Rect::ZERO
+                .with_size(Size::new(1.0, viewport.height()))
+                .with_origin(Point::new(
+                    viewport.x0 + viewport.width() - BAR_WIDTH,
+                    viewport.y0,
+                ))
+                .inflate(0.0, 10.0),
+            editor_style.scroll_bar(),
+            0.0,
+        );
     }
 }
 impl View for EditorView {
@@ -883,6 +936,14 @@ impl Widget for EditorView {
 
     fn style(&mut self, cx: &mut crate::context::StyleCx<'_>) {
         if self.editor_view_style.read(cx) {
+            cx.app_state_mut().request_paint(self.id());
+        }
+
+        if self.editor_style.read(cx) {
+            self.editor.update(|ed| {
+                ed.editor_style.set(self.editor_style.clone());
+                ed.floem_style_id.update(|val| *val += 1);
+            });
             cx.app_state_mut().request_paint(self.id());
         }
     }
@@ -971,6 +1032,9 @@ impl Widget for EditorView {
         );
         let screen_lines = ed.screen_lines.get_untracked();
         EditorView::paint_text(cx, &ed, viewport, &screen_lines, &self.editor_view_style);
+
+        // TODO: what is going on here? Why is this necessary
+        EditorView::paint_scroll_bar(cx, viewport, &self.editor_view_style);
     }
 }
 
@@ -1037,7 +1101,8 @@ pub fn editor_view(
         editor,
         is_active,
         inner_node: None,
-        editor_view_style: Default::default(),
+        editor_view_style: EditorViewStyle::default(),
+        editor_style: EditorStyle::default(),
     }
     .on_event(EventListener::ImePreedit, move |event| {
         if !is_active.get_untracked() {
@@ -1218,8 +1283,17 @@ fn editor_content(
 
     scroll({
         let editor_content_view = editor_view(editor, is_active).style(move |s| {
-            s.absolute().cursor(CursorStyle::Text)
-            // .min_size_pct(100.0, 100.0)
+            // TODO: don't assume line height is constant?
+            // just use the last line's line height maybe, or just make
+            // scroll beyond last line a f32
+            // TODO: we shouldn't be using `get` on editor here, isn't this more of a 'has the
+            // style cache changed'?
+            let padding_bottom = editor.get().line_height(0);
+
+            s.absolute()
+                .padding_bottom(padding_bottom)
+                .cursor(CursorStyle::Text)
+                .min_size_pct(100.0, 100.0)
         });
 
         let id = editor_content_view.id();
@@ -1252,6 +1326,7 @@ fn editor_content(
                     return;
                 };
 
+                id.request_style();
                 handle_key_event(&keypress, key_event.modifiers);
 
                 let mut mods = key_event.modifiers;
@@ -1312,7 +1387,8 @@ fn editor_content(
             rect.inflate(0.0, viewport.height() / 2.0)
         } else {
             let mut rect = rect;
-            let cursor_surrounding_lines = editor.es.with(|s| s.cursor_surounding_lines()) as f64;
+            let cursor_surrounding_lines =
+                editor.editor_style.with(|s| s.cursor_surounding_lines()) as f64;
             rect.y0 -= cursor_surrounding_lines * line_height;
             rect.y1 += cursor_surrounding_lines * line_height;
             rect

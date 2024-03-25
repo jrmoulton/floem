@@ -55,7 +55,7 @@ use self::{
     layout::TextLayoutLine,
     phantom_text::PhantomTextLine,
     text::{Document, Preedit, PreeditData, RenderWhitespace, Styling, WrapMethod},
-    view::{LineInfo, ScreenLines, ScreenLinesBase},
+    view::{EditorStyle, LineInfo, ScreenLines, ScreenLinesBase},
     visual_line::{
         hit_position_aff, ConfigId, FontSizeCacheId, LayoutEvent, LineFontSizeProvider, Lines,
         RVLine, ResolvedWrap, TextLayoutProvider, VLine, VLineInfo,
@@ -110,9 +110,9 @@ impl EditorStyle {
 
 pub(crate) const CHAR_WIDTH: f64 = 7.5;
 
-/// The main structure for the editor view itself.  
+/// The main structure for the editor view itself.
 /// This can be considered to be the data part of the `View`.
-/// It holds an `Rc<dyn Document>` within as the document it is a view into.  
+/// It holds an `Rc<dyn Document>` within as the document it is a view into.
 #[derive(Clone)]
 pub struct Editor {
     pub cx: Cell<Scope>,
@@ -124,6 +124,15 @@ pub struct Editor {
 
     /// Whether you can edit within this editor.
     pub read_only: RwSignal<bool>,
+
+    /// Whether modal mode is enabled
+    pub modal: RwSignal<bool>,
+    /// Whether line numbers are relative in modal mode
+    pub modal_relative_line_numbers: RwSignal<bool>,
+
+    /// Whether to insert the indent that is detected for the file when a tab character
+    /// is inputted.
+    pub smart_tab: RwSignal<bool>,
 
     pub(crate) doc: RwSignal<Rc<dyn Document>>,
     pub(crate) style: RwSignal<Rc<dyn Styling>>,
@@ -149,17 +158,16 @@ pub struct Editor {
 
     pub last_movement: RwSignal<Movement>,
 
-    /// Whether ime input is allowed.  
+    /// Whether ime input is allowed.
     /// Should not be set manually outside of the specific handling for ime.
     pub ime_allowed: RwSignal<bool>,
 
-    /// The Editor Style
-    pub es: RwSignal<EditorStyle>,
+    pub editor_style: RwSignal<EditorStyle>,
 
     pub floem_style_id: RwSignal<u64>,
 }
 impl Editor {
-    /// Create a new editor into the given document, using the styling.  
+    /// Create a new editor into the given document, using the styling.
     /// `doc`: The backing [`Document`], such as [TextDocument](self::text_document::TextDocument)
     /// `style`: How the editor should be styled, such as [SimpleStyling](self::text::SimpleStyling)
     pub fn new(cx: Scope, doc: Rc<dyn Document>, style: Rc<dyn Styling>) -> Editor {
@@ -167,8 +175,8 @@ impl Editor {
         Editor::new_id(cx, id, doc, style)
     }
 
-    /// Create a new editor into the given document, using the styling.  
-    /// `id` should typically be constructed by [`EditorId::next`]  
+    /// Create a new editor into the given document, using the styling.
+    /// `id` should typically be constructed by [`EditorId::next`]
     /// `doc`: The backing [`Document`], such as [TextDocument](self::text_document::TextDocument)
     /// `style`: How the editor should be styled, such as [SimpleStyling](self::text::SimpleStyling)
     pub fn new_id(
@@ -188,8 +196,8 @@ impl Editor {
     // TODO: should we really allow callers to arbitrarily specify the Id? That could open up
     // confusing behavior.
 
-    /// Create a new editor into the given document, using the styling.  
-    /// `id` should typically be constructed by [`EditorId::next`]  
+    /// Create a new editor into the given document, using the styling.
+    /// `id` should typically be constructed by [`EditorId::next`]
     /// `doc`: The backing [`Document`], such as [TextDocument](self::text_document::TextDocument)
     /// `style`: How the editor should be styled, such as [SimpleStyling](self::text::SimpleStyling)
     /// This does *not* create the view effects. Use this if you're creating an editor and then
@@ -236,6 +244,9 @@ impl Editor {
             id,
             active: cx.create_rw_signal(false),
             read_only: cx.create_rw_signal(false),
+            modal: cx.create_rw_signal(modal),
+            modal_relative_line_numbers: cx.create_rw_signal(true),
+            smart_tab: cx.create_rw_signal(true),
             doc,
             style,
             cursor,
@@ -250,7 +261,7 @@ impl Editor {
             cursor_info: CursorInfo::new(cx),
             last_movement: cx.create_rw_signal(Movement::Left),
             ime_allowed: cx.create_rw_signal(false),
-            es: editor_style,
+            editor_style: cx.create_rw_signal(Default::default()),
             floem_style_id: cx.create_rw_signal(0),
         };
 
@@ -347,10 +358,11 @@ impl Editor {
 
         batch(|| {
             editor.read_only.set(self.read_only.get_untracked());
-            editor.es.set(self.es.get_untracked());
+            editor.modal.set(self.modal.get_untracked());
             editor
-                .floem_style_id
-                .set(self.floem_style_id.get_untracked());
+                .modal_relative_line_numbers
+                .set(self.modal_relative_line_numbers.get_untracked());
+            editor.smart_tab.set(self.smart_tab.get_untracked());
             editor.cursor.set(self.cursor.get_untracked());
             editor.scroll_delta.set(self.scroll_delta.get_untracked());
             editor.scroll_to.set(self.scroll_to.get_untracked());
@@ -374,7 +386,7 @@ impl Editor {
         self.style.get_untracked()
     }
 
-    /// Get the text of the document  
+    /// Get the text of the document
     /// You should typically prefer [`Self::rope_text`]
     pub fn text(&self) -> Rope {
         self.doc().text()
@@ -598,7 +610,7 @@ impl Editor {
 
     pub fn phantom_text(&self, line: usize) -> PhantomTextLine {
         self.doc()
-            .phantom_text(self.id(), &self.es.get_untracked(), line)
+            .phantom_text(self.id(), &self.editor_style.get_untracked(), line)
     }
 
     pub fn line_height(&self, line: usize) -> f32 {
@@ -628,8 +640,8 @@ impl Editor {
             .iter_vlines_over(self.text_prov(), backwards, start, end)
     }
 
-    /// Iterator over *relative* [`VLineInfo`]s, starting at the buffer line, `start_line`.  
-    /// The `visual_line`s provided by this will start at 0 from your `start_line`.  
+    /// Iterator over *relative* [`VLineInfo`]s, starting at the buffer line, `start_line`.
+    /// The `visual_line`s provided by this will start at 0 from your `start_line`.
     /// This is preferable over `iter_lines` if you do not need to absolute visual line value.
     pub fn iter_rvlines(
         &self,
@@ -640,8 +652,8 @@ impl Editor {
     }
 
     /// Iterator over *relative* [`VLineInfo`]s, starting at the buffer line, `start_line` and
-    /// ending at `end_line`.  
-    /// `start_line..end_line`  
+    /// ending at `end_line`.
+    /// `start_line..end_line`
     /// This is preferable over `iter_lines` if you do not need to absolute visual line value.
     pub fn iter_rvlines_over(
         &self,
@@ -683,7 +695,7 @@ impl Editor {
 
     // ==== Line/Column Positioning ====
 
-    /// Convert an offset into the buffer into a line and idx.  
+    /// Convert an offset into the buffer into a line and idx.
     pub fn offset_to_line_col(&self, offset: usize) -> (usize, usize) {
         self.rope_text().offset_to_line_col(offset)
     }
@@ -715,7 +727,7 @@ impl Editor {
     }
 
     /// `affinity` decides whether an offset at a soft line break is considered to be on the
-    /// previous line or the next line.  
+    /// previous line or the next line.
     /// If `affinity` is `CursorAffinity::Forward` and is at the very end of the wrapped line, then
     /// the offset is considered to be on the next line.
     pub fn vline_of_offset(&self, offset: usize, affinity: CursorAffinity) -> VLine {
@@ -740,7 +752,7 @@ impl Editor {
         self.lines.offset_of_vline(&self.text_prov(), vline)
     }
 
-    /// Get the visual line and column of the given offset.  
+    /// Get the visual line and column of the given offset.
     /// The column is before phantom text is applied.
     pub fn vline_col_of_offset(&self, offset: usize, affinity: CursorAffinity) -> (VLine, usize) {
         self.lines
@@ -813,7 +825,7 @@ impl Editor {
     }
 
     /// Returns the point into the text layout of the line at the given line and col.
-    /// `x` being the leading edge of the character, and `y` being the baseline.  
+    /// `x` being the leading edge of the character, and `y` being the baseline.
     pub fn line_point_of_line_col(
         &self,
         line: usize,
@@ -894,9 +906,9 @@ impl Editor {
         let hit_point = text_layout.text.hit_point(Point::new(point.x, y));
         // We have to unapply the phantom text shifting in order to get back to the column in
         // the actual buffer
-        let phantom_text = self
-            .doc()
-            .phantom_text(self.id(), &self.es.get_untracked(), line);
+        let phantom_text =
+            self.doc()
+                .phantom_text(self.id(), &self.editor_style.get_untracked(), line);
         let col = phantom_text.before_col(hit_point.index);
         // Ensure that the column doesn't end up out of bounds, so things like clicking on the far
         // right end will just go to the end of the line.
@@ -973,7 +985,7 @@ impl Editor {
         }
     }
 
-    /// Advance to the right in the manner of the given mode.  
+    /// Advance to the right in the manner of the given mode.
     /// This is not the same as the [`Movement::Right`] command.
     pub fn move_right(&self, offset: usize, mode: Mode, count: usize) -> usize {
         self.rope_text().move_right(offset, mode, count)
@@ -1005,7 +1017,7 @@ impl Editor {
         let floem_style_id = self.floem_style_id;
         self.lines.get_init_text_layout(
             cache_rev,
-            ConfigId::new(id, floem_style_id.get_untracked()),
+            (id, floem_style_id.get_untracked()),
             self,
             line,
             trigger,
@@ -1016,11 +1028,8 @@ impl Editor {
         let cache_rev = self.doc().cache_rev().get_untracked();
         let id = self.style().id();
         let floem_style_id = self.floem_style_id;
-        self.lines.try_get_text_layout(
-            cache_rev,
-            ConfigId::new(id, floem_style_id.get_untracked()),
-            line,
-        )
+        self.lines
+            .try_get_text_layout(cache_rev, (id, floem_style_id.get_untracked()), line)
     }
 
     /// Create rendable whitespace layout by creating a new text layout
@@ -1125,12 +1134,16 @@ impl TextLayoutProvider for Editor {
             line_content_original.to_string()
         };
         // Combine the phantom text with the line content
-        let phantom_text = doc.phantom_text(edid, &self.es.get_untracked(), line);
+        let phantom_text = doc.phantom_text(edid, &self.editor_style.get_untracked(), line);
         let line_content = phantom_text.combine_with_text(&line_content);
 
         let family = style.font_family(edid, line);
         let attrs = Attrs::new()
-            .color(self.es.with(|s| s.ed_text_color()))
+            .color(
+                self.editor_style
+                    .with(|s| s.text_color())
+                    .unwrap_or(Color::BLACK),
+            )
             .family(&family)
             .font_size(font_size as f32)
             .line_height(LineHeightValue::Px(style.line_height(edid, line)));
@@ -1145,6 +1158,8 @@ impl TextLayoutProvider for Editor {
 
             let mut attrs = attrs;
             if let Some(fg) = phantom.fg {
+                //TODO: Phantom text color?
+                // attrs = self.editor_style ;
                 attrs = attrs.color(fg);
             } else {
                 attrs = attrs.color(self.es.with(|es| es.phantom_color()))
@@ -1166,8 +1181,7 @@ impl TextLayoutProvider for Editor {
         text_layout.set_tab_width(style.tab_width(edid, line));
         text_layout.set_text(&line_content, attrs_list);
 
-        // dbg!(self.editor_style.with(|s| s.wrap_method()));
-        match self.es.with(|s| s.wrap_method()) {
+        match self.editor_style.with(|s| s.wrap_method()) {
             WrapMethod::None => {}
             WrapMethod::EditorWidth => {
                 let width = self.viewport.get_untracked().width();
@@ -1186,7 +1200,7 @@ impl TextLayoutProvider for Editor {
             &line_content_original,
             &text_layout,
             &phantom_text,
-            self.es.with(|s| s.render_white_space()),
+            self.editor_style.with(|s| s.render_white_space()),
         );
 
         let indent_line = style.indent_line(edid, line, &line_content_original);
@@ -1221,12 +1235,12 @@ impl TextLayoutProvider for Editor {
 
     fn before_phantom_col(&self, line: usize, col: usize) -> usize {
         self.doc()
-            .before_phantom_col(self.id(), &self.es.get_untracked(), line, col)
+            .before_phantom_col(self.id(), &self.editor_style.get_untracked(), line, col)
     }
 
     fn has_multiline_phantom(&self) -> bool {
         self.doc()
-            .has_multiline_phantom(self.id(), &self.es.get_untracked())
+            .has_multiline_phantom(self.id(), &self.editor_style.get_untracked())
     }
 }
 
@@ -1330,7 +1344,7 @@ fn create_view_effects(cx: Scope, ed: &Editor) {
 
         let viewport = ed.viewport.get();
 
-        let wrap = match ed.es.with(|s| s.wrap_method()) {
+        let wrap = match ed.editor_style.with(|s| s.wrap_method()) {
             WrapMethod::None => ResolvedWrap::None,
             WrapMethod::EditorWidth => {
                 ResolvedWrap::Width((viewport.width() as f32).max(MIN_WRAPPED_WIDTH))
@@ -1404,7 +1418,7 @@ pub fn normal_compute_screen_lines(
         .iter_rvlines_init(
             editor.text_prov(),
             cache_rev,
-            ConfigId::new(style.id(), floem_style_id.get_untracked()),
+            (style.id(), floem_style_id.get_untracked()),
             min_info.rvline,
             false,
         )

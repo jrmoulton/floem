@@ -22,15 +22,13 @@ use crate::{
 };
 
 use super::editor::{
-    gutter::{DimColor, GutterClass, LeftOfCenterPadding, RightOfCenterPadding},
-    text::{RenderWhitespace, WrapMethod},
+    gutter::{GutterClass, LeftOfCenterPadding, RightOfCenterPadding},
+    text::RenderWhitespace,
     view::{
-        CaretColor, CurrentLineColor, EditorViewClass, IndentGuideColor, IndentStyleProp,
-        SelectionColor, VisibleWhitespaceColor,
+        Caret, CursorSurroundingLines, EditorViewClass, IndentStyleProp, PhantomColor,
+        PreeditUnderlineColor, RenderWhiteSpaceProp, ScrollBeyondLastLine, ScrollbarLine,
+        ShowIndentGuide, VisibleWhitespace,
     },
-    CursorSurroundingLines, Modal, ModalRelativeLine, PhantomColor, PlaceholderColor,
-    PreeditUnderlineColor, RenderWhiteSpaceProp, ScrollBeyondLastLine, ShowIndentGuide, SmartTab,
-    WrapProp,
 };
 
 /// A text editor view.
@@ -105,8 +103,7 @@ impl Widget for TextEditor {
     }
 
     fn style(&mut self, cx: &mut crate::context::StyleCx<'_>) {
-        if self.editor.es.try_update(|s| s.read(cx)).unwrap() {
-            self.editor.floem_style_id.update(|val| *val += 1);
+        if self.editor.editor_style.try_update(|s| s.read(cx)).unwrap() {
             cx.app_state_mut().request_paint(self.id());
         }
         self.for_each_child_mut(&mut |child| {
@@ -120,10 +117,14 @@ impl Widget for TextEditor {
     }
 }
 
-pub struct EditorCustomStyle(pub(crate) Style);
+pub struct EditorCustomStyle(Style);
 
 impl EditorCustomStyle {
     /// Sets whether the gutter should be hidden.
+    ///
+    /// # Arguments
+    /// * `hide` - A boolean indicating whether the gutter should be hidden. If `true`, the gutter is hidden.
+    /// Default: `true`
     pub fn hide_gutter(mut self, hide: bool) -> Self {
         self.0 = self
             .0
@@ -131,31 +132,22 @@ impl EditorCustomStyle {
         self
     }
 
-    /// Sets the text accent color of the gutter.
-    /// This is the color of the line number for the current line.
-    /// It will default to the current Text Color
-    pub fn gutter_accent_color(mut self, color: Color) -> Self {
+    // pub fn gutter_style(mut self, style: impl Fn(Style) -> Style) -> Self {
+    //     self.0 = self.0.class(GutterClass, |s| style(s));
+    //     self
+    // }
+
+    pub fn gutter_text_color(mut self, color: Color) -> Self {
         self.0 = self.0.class(GutterClass, |s| s.color(color));
         self
     }
 
-    /// Sets the text dim color of the gutter.
-    /// This is the color of the line number for all lines except the current line.
-    /// If this is not specified it will default to the gutter accent color.
-    pub fn gutter_dim_color(mut self, color: Color) -> Self {
-        self.0 = self.0.class(GutterClass, |s| s.set(DimColor, color));
-        self
-    }
-
-    /// Sets the padding to the left of the nubmers in the gutter.
     pub fn gutter_left_padding(mut self, padding: f64) -> Self {
         self.0 = self
             .0
             .class(GutterClass, |s| s.set(LeftOfCenterPadding, padding));
         self
     }
-
-    /// Sets the padding to the right of the numbers in the gutter.
     pub fn gutter_right_padding(mut self, padding: f64) -> Self {
         self.0 = self
             .0
@@ -163,23 +155,6 @@ impl EditorCustomStyle {
         self
     }
 
-    /// Sets the background color of the current line in the gutter
-    pub fn gutter_current_color(mut self, color: Color) -> Self {
-        self.0 = self
-            .0
-            .class(GutterClass, |s| s.set(CurrentLineColor, color));
-        self
-    }
-
-    /// Sets the background color to be applied around selected text.
-    pub fn selection_color(mut self, color: Color) -> Self {
-        self.0 = self
-            .0
-            .class(EditorViewClass, |s| s.set(SelectionColor, color));
-        self
-    }
-
-    /// Sets the indent style.
     pub fn indent_style(mut self, indent_style: IndentStyle) -> Self {
         self.0 = self
             .0
@@ -187,101 +162,77 @@ impl EditorCustomStyle {
         self
     }
 
-    pub fn indent_guide_color(mut self, color: Color) -> Self {
+    // thin line to the left of the scroll bar
+    pub fn scroll_bar_line_color(mut self, color: Color) -> Self {
         self.0 = self
             .0
-            .class(EditorViewClass, |s| s.set(IndentGuideColor, color));
+            .class(EditorViewClass, |s| s.set(ScrollbarLine, color));
         self
     }
 
-    /// Sets the method for wrapping lines.
-    pub fn wrap_method(mut self, wrap: WrapMethod) -> Self {
-        self.0 = self.0.set(WrapProp, wrap);
-        self
-    }
-
-    /// Sets the color of the cursor.
     pub fn cursor_color(mut self, cursor: Color) -> Self {
-        self.0 = self.0.class(EditorViewClass, |s| s.set(CaretColor, cursor));
+        self.0 = self.0.class(EditorViewClass, |s| s.set(Caret, cursor));
+        self
+    }
+
+    // what does this do?
+    pub fn foreground_color(mut self, fg: Color) -> Self {
+        self.0 = self.0.set(super::editor::view::Foreground, fg);
         self
     }
 
     /// Allow scrolling beyond the last line of the document.
-    pub fn scroll_beyond_last_line(mut self, scroll_beyond: bool) -> Self {
+    /// Equivalent to setting [`Editor::scroll_beyond_last_line`]
+    /// Default: `false`
+    pub fn scroll_beyond_last_line(mut self, scroll_beyong_last_line: bool) -> Self {
         self.0 = self.0.class(EditorViewClass, |s| {
-            s.set(ScrollBeyondLastLine, scroll_beyond)
+            s.set(ScrollBeyondLastLine, scroll_beyong_last_line)
         });
         self
     }
 
-    /// Sets the background color of the current line.
-    pub fn current_line_color(mut self, color: Color) -> Self {
+    /// Set the number of lines to keep visible above and below the cursor.
+    /// Equivalent to setting [`Editor::cursor_surrounding_lines`]
+    /// Default: `1`
+    pub fn cursor_surrounding_lines(mut self, lines: usize) -> Self {
         self.0 = self
             .0
-            .class(EditorViewClass, |s| s.set(CurrentLineColor, color));
+            .class(EditorViewClass, |s| s.set(CursorSurroundingLines, lines));
         self
     }
 
-    /// Sets the color of visible whitespace characters.
+    pub fn render_white_space(mut self, render_white_space: RenderWhitespace) -> Self {
+        self.0 = self.0.class(EditorViewClass, |s| {
+            s.set(RenderWhiteSpaceProp, render_white_space)
+        });
+        self
+    }
+
     pub fn visible_white_space(mut self, color: Color) -> Self {
         self.0 = self
             .0
-            .class(EditorViewClass, |s| s.set(VisibleWhitespaceColor, color));
+            .class(EditorViewClass, |s| s.set(VisibleWhitespace, color));
         self
     }
 
-    /// Sets which white space characters should be rendered.
-    pub fn render_white_space(mut self, render_white_space: RenderWhitespace) -> Self {
-        self.0 = self.0.set(RenderWhiteSpaceProp, render_white_space);
+    pub fn show_indent_guide(mut self, show: bool) -> Self {
+        self.0 = self
+            .0
+            .class(EditorViewClass, |s| s.set(ShowIndentGuide, show));
         self
     }
 
-    /// Set the number of lines to keep visible above and below the cursor.
-    /// Default: `1`
-    pub fn cursor_surrounding_lines(mut self, lines: usize) -> Self {
-        self.0 = self.0.set(CursorSurroundingLines, lines);
-        self
-    }
-
-    /// Sets whether the indent guides should be displayed.
-    pub fn indent_guide(mut self, show: bool) -> Self {
-        self.0 = self.0.set(ShowIndentGuide, show);
-        self
-    }
-
-    /// Sets the editor's mode to modal or non-modal.
-    pub fn modal(mut self, modal: bool) -> Self {
-        self.0 = self.0.set(Modal, modal);
-        self
-    }
-
-    /// Determines if line numbers are relative in modal mode.
-    pub fn modal_relative_line(mut self, modal_relative_line: bool) -> Self {
-        self.0 = self.0.set(ModalRelativeLine, modal_relative_line);
-        self
-    }
-
-    /// Enables or disables smart tab behavior, which inserts the indent style detected in the file when the tab key is pressed.
-    pub fn smart_tab(mut self, smart_tab: bool) -> Self {
-        self.0 = self.0.set(SmartTab, smart_tab);
-        self
-    }
-
-    /// Sets the color of phantom text
     pub fn phantom_color(mut self, color: Color) -> Self {
-        self.0 = self.0.set(PhantomColor, color);
+        self.0 = self
+            .0
+            .class(EditorViewClass, |s| s.set(PhantomColor, color));
         self
     }
 
-    /// Sets the color of the placeholder text.
-    pub fn placeholder_color(mut self, color: Color) -> Self {
-        self.0 = self.0.set(PlaceholderColor, color);
-        self
-    }
-
-    /// Sets the color of the underline for preedit text.
     pub fn preedit_underline_color(mut self, color: Color) -> Self {
-        self.0 = self.0.set(PreeditUnderlineColor, color);
+        self.0 = self
+            .0
+            .class(EditorViewClass, |s| s.set(PreeditUnderlineColor, color));
         self
     }
 }
@@ -337,7 +288,7 @@ impl TextEditor {
         self.editor.doc()
     }
 
-    /// Try downcasting the document to a [`TextDocument`].  
+    /// Try downcasting the document to a [`TextDocument`].
     /// Returns `None` if the document is not a [`TextDocument`].
     fn text_doc(&self) -> Option<Rc<TextDocument>> {
         self.doc().downcast_rc().ok()
@@ -348,13 +299,13 @@ impl TextEditor {
         self.editor.rope_text()
     }
 
-    /// Use a different document in the text editor  
+    /// Use a different document in the text editor
     pub fn use_doc(self, doc: Rc<dyn Document>) -> Self {
         self.editor.update_doc(doc, None);
         self
     }
 
-    /// Use the same document as another text editor view.  
+    /// Use the same document as another text editor view.
     /// ```rust,ignore
     /// let primary = text_editor();
     /// let secondary = text_editor().share_document(&primary);
@@ -363,7 +314,7 @@ impl TextEditor {
     ///     primary,
     ///     secondary,
     /// ))
-    /// ```  
+    /// ```
     /// If you wish for it to also share the styling, consider using [`TextEditor::shared_editor`]
     /// instead.
     pub fn share_doc(self, other: &TextEditor) -> Self {
@@ -396,7 +347,7 @@ impl TextEditor {
         }
     }
 
-    /// Change the [`Styling`] used for the editor.  
+    /// Change the [`Styling`] used for the editor.
     /// ```rust,ignore
     /// let styling = SimpleStyling::builder()
     ///     .font_size(12)
@@ -421,6 +372,14 @@ impl TextEditor {
         self
     }
 
+    /// Insert the indent that is detected fror the file when tab is pressed.
+    /// Equivalent to setting [`Editor::smart_tab`]
+    /// Default: `false`
+    pub fn smart_tab(self) -> Self {
+        self.editor.smart_tab.set(true);
+        self
+    }
+
     /// Set the placeholder text that is displayed when the document is empty.
     /// Can span multiple lines.
     /// This is per-editor, not per-document.
@@ -436,9 +395,9 @@ impl TextEditor {
         self
     }
 
-    /// When commands are run on the document, this function is called.  
+    /// When commands are run on the document, this function is called.
     /// If it returns [`CommandExecuted::Yes`] then further handlers after it, including the
-    /// default handler, are not executed.  
+    /// default handler, are not executed.
     /// ```rust
     /// use floem::views::editor::command::{Command, CommandExecuted};
     /// use floem::views::text_editor::text_editor;
@@ -446,7 +405,7 @@ impl TextEditor {
     /// text_editor("Hello")
     ///     .pre_command(|ev| {
     ///         if matches!(ev.cmd, Command::Edit(EditCommand::Undo)) {
-    ///             // Sorry, no undoing allowed   
+    ///             // Sorry, no undoing allowed
     ///             CommandExecuted::Yes
     ///         } else {
     ///             CommandExecuted::No
@@ -461,8 +420,8 @@ impl TextEditor {
     ///         CommandExecuted::No
     ///     });
     /// ```
-    /// Note that these are specific to each text editor view.  
-    ///   
+    /// Note that these are specific to each text editor view.
+    ///
     /// Note: only works for the default backing [`TextDocument`] doc
     pub fn pre_command(self, f: impl Fn(PreCommand) -> CommandExecuted + 'static) -> Self {
         if let Some(doc) = self.text_doc() {
@@ -471,9 +430,9 @@ impl TextEditor {
         self
     }
 
-    /// Listen for deltas applied to the editor.  
+    /// Listen for deltas applied to the editor.
     /// Useful for anything that has positions based in the editor that can be updated after
-    /// typing, such as syntax highlighting.  
+    /// typing, such as syntax highlighting.
     /// Note: only works for the default backing [`TextDocument`] doc
     pub fn update(self, f: impl Fn(OnUpdate) + 'static) -> Self {
         if let Some(doc) = self.text_doc() {

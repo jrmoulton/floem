@@ -51,7 +51,7 @@ impl<'a> OnUpdate<'a> {
     }
 }
 
-/// A simple text document that holds content in a rope.  
+/// A simple text document that holds content in a rope.
 /// This can be used as a base structure for common operations.
 #[derive(Clone)]
 pub struct TextDocument {
@@ -251,7 +251,7 @@ impl DocumentPhantom for TextDocument {
                     col: 0,
                     text: placeholder,
                     font_size: None,
-                    fg: Some(styling.placeholder_color()),
+                    fg: Some(styling.phantom_color()),
                     bg: None,
                     under_line: None,
                 });
