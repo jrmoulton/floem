@@ -720,70 +720,70 @@ pub struct SimpleStylingBuilder {
     wrap: Option<WrapMethod>,
 }
 impl SimpleStylingBuilder {
-    /// Set the font size  
+    /// Set the font size
     /// Default: 16
     pub fn font_size(&mut self, font_size: usize) -> &mut Self {
         self.font_size = Some(font_size);
         self
     }
 
-    /// Set the line height  
+    /// Set the line height
     /// Default: 1.5
     pub fn line_height(&mut self, line_height: f32) -> &mut Self {
         self.line_height = Some(line_height);
         self
     }
 
-    /// Set the font families used  
+    /// Set the font families used
     /// Default: `[FamilyOwned::SansSerif]`
     pub fn font_family(&mut self, font_family: Vec<FamilyOwned>) -> &mut Self {
         self.font_family = Some(font_family);
         self
     }
 
-    /// Set the font weight (such as boldness or thinness)  
+    /// Set the font weight (such as boldness or thinness)
     /// Default: `Weight::NORMAL`
     pub fn weight(&mut self, weight: Weight) -> &mut Self {
         self.weight = Some(weight);
         self
     }
 
-    /// Set the italic style  
+    /// Set the italic style
     /// Default: `Style::Normal`
     pub fn italic_style(&mut self, italic_style: crate::cosmic_text::Style) -> &mut Self {
         self.italic_style = Some(italic_style);
         self
     }
 
-    /// Set the font stretch  
+    /// Set the font stretch
     /// Default: `Stretch::Normal`
     pub fn stretch(&mut self, stretch: Stretch) -> &mut Self {
         self.stretch = Some(stretch);
         self
     }
 
-    /// Set the indent style  
+    /// Set the indent style
     /// Default: `IndentStyle::Spaces(4)`
     pub fn indent_style(&mut self, indent_style: IndentStyle) -> &mut Self {
         self.indent_style = Some(indent_style);
         self
     }
 
-    /// Set the tab width  
+    /// Set the tab width
     /// Default: 4
     pub fn tab_width(&mut self, tab_width: usize) -> &mut Self {
         self.tab_width = Some(tab_width);
         self
     }
 
-    /// Set whether the cursor should treat leading soft tabs as if they are hard tabs  
+    /// Set whether the cursor should treat leading soft tabs as if they are hard tabs
     /// Default: false
     pub fn atomic_soft_tabs(&mut self, atomic_soft_tabs: bool) -> &mut Self {
         self.atomic_soft_tabs = Some(atomic_soft_tabs);
         self
     }
 
-    /// Set the wrapping method  
+    /// Set the wrapping method
     /// Default: `WrapMethod::EditorWidth`
     pub fn wrap(&mut self, wrap: WrapMethod) -> &mut Self {
         self.wrap = Some(wrap);
