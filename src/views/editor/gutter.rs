@@ -10,12 +10,12 @@ use crate::{
     views::Decorators,
     Renderer,
 };
-use floem_editor_core::mode::Mode;
+use floem_editor_core::{cursor::CursorMode, mode::Mode};
 use floem_peniko::Color;
 use floem_reactive::RwSignal;
 use kurbo::Rect;
 
-use super::Editor;
+use super::{view::CurrentLineColor, Editor};
 
 prop!(pub LeftOfCenterPadding: f64 {} = 25.);
 prop!(pub RightOfCenterPadding: f64 {} = 30.);
@@ -27,6 +27,7 @@ prop_extractor! {
         dim_color: DimColor,
         left_padding: LeftOfCenterPadding,
         right_padding: RightOfCenterPadding,
+        current_line_color: CurrentLineColor,
     }
 }
 
