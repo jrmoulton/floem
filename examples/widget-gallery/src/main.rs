@@ -15,8 +15,9 @@ pub mod slider;
 use floem::{
     event::{Event, EventListener, EventPropagation},
     keyboard::{Key, NamedKey},
-    peniko::Color,
-    reactive::create_signal,
+    kurbo::Point,
+    peniko::{Color, Gradient},
+    reactive::{create_signal, RwSignal},
     style::{Background, CursorStyle, Transition},
     unit::UnitExt,
     views::{
@@ -27,6 +28,8 @@ use floem::{
 };
 
 fn app_view() -> impl IntoView {
+    let grad_start = RwSignal::new(0.);
+    let grad_end = RwSignal::new(1.);
     let tabs: im::Vector<&str> = vec![
         "Label",
         "Button",
@@ -98,25 +101,44 @@ fn app_view() -> impl IntoView {
                     .keyboard_navigatable()
                     .draggable()
                     .style(move |s| {
+                        let start_point: Point = (0., 0.).into();
+                        let end_point: Point = (140., 0.).into();
+                        let grad_start = move || grad_start.get() / 100.;
+                        let grad_end = move || grad_end.get() / 100.;
                         s.flex_row()
                             .padding(5.0)
                             .width(100.pct())
                             .height(36.0)
-                            .transition(Background, Transition::linear(0.4))
+                            .transition(Background, Transition::linear(0.5))
                             .items_center()
                             .border_bottom(1.0)
                             .border_color(Color::LIGHT_GRAY)
+                            .background(Gradient::new_linear(start_point, end_point).with_stops([
+                                (0., Color::BLUE),
+                                (grad_start(), Color::BLUE),
+                                (grad_end(), Color::RED),
+                            ]))
                             .apply_if(index == active_tab.get(), |s| {
-                                s.background(Color::GRAY.with_alpha_factor(0.6))
+                                s.background(
+                                    Gradient::new_linear(start_point, end_point).with_stops([
+                                        (0., Color::YELLOW),
+                                        (grad_start(), Color::YELLOW),
+                                        (grad_end(), Color::GREEN),
+                                    ]),
+                                )
+                            })
+                            .hover(|s| {
+                                s.background(
+                                    Gradient::new_linear(start_point, end_point).with_stops([
+                                        (0., Color::RED),
+                                        (grad_start(), Color::RED),
+                                        (grad_end(), Color::BLUE),
+                                    ]),
+                                )
+                                .apply_if(index == active_tab.get(), |s| s.background(Color::BLUE))
+                                .cursor(CursorStyle::Pointer)
                             })
                             .focus_visible(|s| s.border(2.).border_color(Color::BLUE))
-                            .hover(|s| {
-                                s.background(Color::LIGHT_GRAY)
-                                    .apply_if(index == active_tab.get(), |s| {
-                                        s.background(Color::GRAY)
-                                    })
-                                    .cursor(CursorStyle::Pointer)
-                            })
                     })
             },
         )
@@ -138,19 +160,35 @@ fn app_view() -> impl IntoView {
         move || active_tab.get(),
         move || tabs.get(),
         |it| *it,
-        |it| match it {
-            "Label" => labels::label_view().into_any(),
-            "Button" => buttons::button_view().into_any(),
-            "Checkbox" => checkbox::checkbox_view().into_any(),
-            "Radio" => radio_buttons::radio_buttons_view().into_any(),
-            "Input" => inputs::text_input_view().into_any(),
-            "List" => lists::virt_list_view().into_any(),
-            "Menu" => context_menu::menu_view().into_any(),
-            "RichText" => rich_text::rich_text_view().into_any(),
-            "Image" => images::img_view().into_any(),
-            "Clipboard" => clipboard::clipboard_view().into_any(),
-            "Slider" => slider::slider_view().into_any(),
-            "Dropdown" => dropdown::dropdown_view().into_any(),
+        move |it| match it {
+            "Label" => labels::label_view().debug_name("Label View").into_any(),
+            "Button" => buttons::button_view().debug_name("Button View").into_any(),
+            "Checkbox" => checkbox::checkbox_view()
+                .debug_name("Checkbox View")
+                .into_any(),
+            "Radio" => radio_buttons::radio_buttons_view()
+                .debug_name("Radio Buttons View")
+                .into_any(),
+            "Input" => inputs::text_input_view()
+                .debug_name("Text Input View")
+                .into_any(),
+            "List" => lists::virt_list_view()
+                .debug_name("Virtual List View")
+                .into_any(),
+            "Menu" => context_menu::menu_view().debug_name("Menu View").into_any(),
+            "RichText" => rich_text::rich_text_view()
+                .debug_name("Rich Text View")
+                .into_any(),
+            "Image" => images::img_view().debug_name("Image View").into_any(),
+            "Clipboard" => clipboard::clipboard_view()
+                .debug_name("Clipboard View")
+                .into_any(),
+            "Slider" => slider::slider_view(grad_start, grad_end)
+                .debug_name("Slider View")
+                .into_any(),
+            "Dropdown" => dropdown::dropdown_view()
+                .debug_name("Dropdown View")
+                .into_any(),
             _ => label(|| "Not implemented".to_owned()).into_any(),
         },
     )

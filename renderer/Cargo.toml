@@ -13,4 +13,5 @@ image = { workspace = true }
 resvg = { workspace = true }
 swash = { workspace = true }
 
+vello = "0.2.0"
 cosmic-text = { version = "0.12.1", features = ["shape-run-cache"] }

@@ -1,4 +1,5 @@
 use floem::{
+    peniko::Color,
     reactive::create_signal,
     views::{label, ButtonClass, Decorators},
     IntoView,
@@ -14,9 +15,12 @@ fn app_view() -> impl IntoView {
         label(move || format!("Value: {}", counter.get())),
         // Create a horizontal layout
         (
-            "Increment".class(ButtonClass).on_click_stop(move |_| {
-                set_counter.update(|value| *value += 1);
-            }),
+            "Increment"
+                .class(ButtonClass)
+                .style(|s| s.border(0.9).background(Color::TRANSPARENT))
+                .on_click_stop(move |_| {
+                    set_counter.update(|value| *value += 1);
+                }),
             "Decrement".class(ButtonClass).on_click_stop(move |_| {
                 set_counter.update(|value| *value -= 1);
             }),

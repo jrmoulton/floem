@@ -50,14 +50,14 @@
 use crate::text::TextLayout;
 use floem_renderer::Img;
 use floem_tiny_skia_renderer::TinySkiaRenderer;
-use floem_vger_renderer::VgerRenderer;
-use image::DynamicImage;
-use peniko::kurbo::{self, Affine, Rect, Shape, Size};
+pub use floem_vger_renderer::Scene;
+use floem_vger_renderer::VelloRenderer;
+use peniko::kurbo::{self, Affine, Rect, Shape, Size, Stroke};
 use peniko::BrushRef;
 
 #[allow(clippy::large_enum_variant)]
 pub enum Renderer<W> {
-    Vger(VgerRenderer),
+    Vger(VelloRenderer),
     TinySkia(TinySkiaRenderer<W>),
 }
 
@@ -74,7 +74,7 @@ impl<W: wgpu::WindowHandle> Renderer<W> {
             .unwrap_or(false);
 
         let vger_err = if !force_tiny_skia {
-            match VgerRenderer::new(window.clone(), size.width as u32, size.height as u32, scale) {
+            match VelloRenderer::new(window.clone(), size.width as u32, size.height as u32, scale) {
                 Ok(vger) => return Self::Vger(vger),
                 Err(err) => Some(err),
             }
@@ -152,13 +152,18 @@ impl<W: wgpu::WindowHandle> floem_renderer::Renderer for Renderer<W> {
         }
     }
 
-    fn stroke<'b>(&mut self, shape: &impl Shape, brush: impl Into<BrushRef<'b>>, width: f64) {
+    fn stroke<'b, 's>(
+        &mut self,
+        shape: &impl Shape,
+        brush: impl Into<BrushRef<'b>>,
+        stroke: &'s Stroke,
+    ) {
         match self {
             Renderer::Vger(v) => {
-                v.stroke(shape, brush, width);
+                v.stroke(shape, brush, stroke);
             }
             Renderer::TinySkia(v) => {
-                v.stroke(shape, brush, width);
+                v.stroke(shape, brush, stroke);
             }
         }
     }
@@ -239,7 +244,7 @@ impl<W: wgpu::WindowHandle> floem_renderer::Renderer for Renderer<W> {
         }
     }
 
-    fn finish(&mut self) -> Option<DynamicImage> {
+    fn finish(&mut self) -> Option<peniko::Image> {
         match self {
             Renderer::Vger(r) => r.finish(),
             Renderer::TinySkia(r) => r.finish(),

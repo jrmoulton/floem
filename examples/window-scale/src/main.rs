@@ -88,7 +88,7 @@ fn app_view() -> impl IntoView {
             .items_center()
             .justify_center()
             .class(Button, |s| {
-                s.border(1.0)
+                s.border(0.5)
                     .border_radius(10.0)
                     .padding(10.0)
                     .focus_visible(|s| s.border(2.).border_color(Color::BLUE))

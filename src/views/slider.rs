@@ -6,11 +6,12 @@ use floem_winit::keyboard::{Key, NamedKey};
 use peniko::kurbo::{Circle, Point, RoundedRect};
 use peniko::{Brush, Color};
 
+use crate::style::CustomStylable;
 use crate::{
     event::EventPropagation,
     id::ViewId,
     prop, prop_extractor,
-    style::{Background, BorderRadius, CustomStylable, Foreground, Height, Style},
+    style::{Background, BorderRadius, Foreground, Height, Style},
     style_class,
     unit::{PxPct, PxPctAuto},
     view::View,
@@ -308,8 +309,6 @@ impl View for Slider {
             &self.base_bar_style.color().unwrap_or(Color::BLACK.into()),
             0.,
         );
-        cx.save();
-        cx.clip(&self.base_bar);
         cx.fill(
             &self.accent_bar,
             &self
@@ -379,7 +378,7 @@ impl SliderCustomStyle {
     /// # Arguments
     /// * `color` - An optional `Color` that sets the handle's color. If `None` is provided, the handle color is not set.
     pub fn handle_color(mut self, color: impl Into<Option<Brush>>) -> Self {
-        self = SliderCustomStyle(self.0.set(Foreground, color));
+        self = SliderCustomStyle(self.0.set(Foreground, color.into()));
         self
     }
 
