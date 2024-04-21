@@ -117,7 +117,7 @@ pub struct Capture {
     pub taffy_duration: Duration,
     pub taffy_node_count: usize,
     pub taffy_depth: usize,
-    pub window: Option<Rc<DynamicImage>>,
+    pub window: Option<peniko::Image>,
     pub window_size: Size,
     pub scale: f64,
     pub state: CaptureState,
@@ -695,51 +695,55 @@ fn capture_view(
         .as_ref()
         .map(|img| {
             (
-                img.width() as f64 / capture.scale,
-                img.height() as f64 / capture.scale,
+                img.width as f64 / capture.scale,
+                img.height as f64 / capture.scale,
             )
         })
         .unwrap_or_default();
-    let image = img_dynamic(move || window.clone())
-        .style(move |s| {
-            s.margin(5.0)
-                .border(1.0)
-                .border_color(Color::BLACK.with_alpha_factor(0.5))
-                .width(image_width + 2.0)
-                .height(image_height + 2.0)
-                .margin_bottom(21.0)
-                .margin_right(21.0)
-        })
-        .on_event(EventListener::PointerMove, move |e| {
-            if let Event::PointerMove(e) = e {
-                if let Some(view) = capture_.root.find_by_pos(e.pos) {
-                    if capture_view.highlighted.get() != Some(view.id) {
-                        capture_view.highlighted.set(Some(view.id));
-                    }
-                    return EventPropagation::Continue;
+    let image = if let Some(image) = window {
+        img_dynamic(move || image.clone()).into_any()
+    } else {
+        empty().into_any()
+    }
+    .style(move |s| {
+        s.margin(5.0)
+            .border(1.0)
+            .border_color(Color::BLACK.with_alpha_factor(0.5))
+            .width(image_width + 2.0)
+            .height(image_height + 2.0)
+            .margin_bottom(21.0)
+            .margin_right(21.0)
+    })
+    .on_event(EventListener::PointerMove, move |e| {
+        if let Event::PointerMove(e) = e {
+            if let Some(view) = capture_.root.find_by_pos(e.pos) {
+                if capture_view.highlighted.get() != Some(view.id) {
+                    capture_view.highlighted.set(Some(view.id));
                 }
+                return EventPropagation::Continue;
             }
-            if capture_view.highlighted.get().is_some() {
-                capture_view.highlighted.set(None);
+        }
+        if capture_view.highlighted.get().is_some() {
+            capture_view.highlighted.set(None);
+        }
+        EventPropagation::Continue
+    })
+    .on_click(move |e| {
+        if let Event::PointerUp(e) = e {
+            if let Some(view) = capture__.root.find_by_pos(e.pos) {
+                capture_view.selected.set(Some(view.id));
+                capture_view.expanding_selection.set(Some(view.id));
+                return EventPropagation::Stop;
             }
-            EventPropagation::Continue
-        })
-        .on_click(move |e| {
-            if let Event::PointerUp(e) = e {
-                if let Some(view) = capture__.root.find_by_pos(e.pos) {
-                    capture_view.selected.set(Some(view.id));
-                    capture_view.expanding_selection.set(Some(view.id));
-                    return EventPropagation::Stop;
-                }
-            }
-            if capture_view.selected.get().is_some() {
-                capture_view.selected.set(None);
-            }
-            EventPropagation::Stop
-        })
-        .on_event_cont(EventListener::PointerLeave, move |_| {
-            capture_view.highlighted.set(None)
-        });
+        }
+        if capture_view.selected.get().is_some() {
+            capture_view.selected.set(None);
+        }
+        EventPropagation::Stop
+    })
+    .on_event_cont(EventListener::PointerLeave, move |_| {
+        capture_view.highlighted.set(None)
+    });
 
     let capture_ = capture.clone();
     let selected_overlay = empty().style(move |s| {

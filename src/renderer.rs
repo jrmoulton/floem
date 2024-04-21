@@ -239,7 +239,7 @@ impl<W: wgpu::WindowHandle> floem_renderer::Renderer for Renderer<W> {
         }
     }
 
-    fn finish(&mut self) -> Option<DynamicImage> {
+    fn finish(&mut self) -> Option<peniko::Image> {
         match self {
             Renderer::Vger(r) => r.finish(),
             Renderer::TinySkia(r) => r.finish(),

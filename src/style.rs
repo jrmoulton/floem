@@ -428,7 +428,7 @@ macro_rules! prop {
                 static TRANSITION_INFO: $crate::style::StyleKeyInfo = $crate::style::StyleKeyInfo::Transition;
                 static INFO: $crate::style::StyleKeyInfo = $crate::style::StyleKeyInfo::Prop($crate::style::StylePropInfo::new::<$name, $ty>(
                     prop!([impl inherited][$($options)*]),
-                    || std::rc::Rc::new($crate::style::StyleMapValue::Val($name::default_value())),
+                    || std::rc::Rc::new($crate::style::StyleMapValue::Val(<$name as $crate::style::StyleProp>::default_value())),
                     $crate::style::StyleKey { info: &TRANSITION_INFO },
                 ));
                 $crate::style::StyleKey { info: &INFO }
@@ -1777,8 +1777,8 @@ impl Style {
         self.set(ZIndex, Some(z_index))
     }
 
-    /// Allow the application of a function if the option exists.  
-    /// This is useful for chaining together a bunch of optional style changes.  
+    /// Allow the application of a function if the option exists.
+    /// This is useful for chaining together a bunch of optional style changes.
     /// ```rust
     /// use floem::style::Style;
     /// let maybe_none: Option<i32> = None;
@@ -1796,7 +1796,7 @@ impl Style {
         }
     }
 
-    /// Allow the application of a function if the condition holds.  
+    /// Allow the application of a function if the condition holds.
     /// This is useful for chaining together a bunch of optional style changes.
     /// ```rust
     /// use floem::style::Style;

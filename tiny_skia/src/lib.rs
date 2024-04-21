@@ -6,7 +6,6 @@ use floem_renderer::tiny_skia::{
 };
 use floem_renderer::Img;
 use floem_renderer::Renderer;
-use image::DynamicImage;
 use peniko::kurbo::PathEl;
 use peniko::{
     kurbo::{Affine, Point, Rect, Shape},
@@ -457,10 +456,14 @@ impl<W: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle
             return;
         }
 
-        let rgba_image = img.img.clone().into_rgba8();
-        let mut pixmap = try_ret!(Pixmap::new(rgba_image.width(), rgba_image.height()));
-        for (a, &b) in pixmap.pixels_mut().iter_mut().zip(rgba_image.pixels()) {
-            *a = tiny_skia::Color::from_rgba8(b.0[0], b.0[1], b.0[2], b.0[3])
+        let image_data = img.img.data.data();
+        let mut pixmap = try_ret!(Pixmap::new(img.img.width, img.img.height));
+        for (a, b) in pixmap
+            .pixels_mut()
+            .iter_mut()
+            .zip(image_data.chunks_exact(4))
+        {
+            *a = tiny_skia::Color::from_rgba8(b[0], b[1], b[2], b[3])
                 .premultiply()
                 .to_color_u8();
         }
@@ -535,7 +538,7 @@ impl<W: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle
         self.clip = None;
     }
 
-    fn finish(&mut self) -> Option<DynamicImage> {
+    fn finish(&mut self) -> Option<peniko::Image> {
         // Remove cache entries which were not accessed.
         self.image_cache.retain(|_, (c, _)| *c == self.cache_color);
         self.glyph_cache.retain(|_, (c, _)| *c == self.cache_color);

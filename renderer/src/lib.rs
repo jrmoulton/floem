@@ -1,6 +1,5 @@
 pub use floem_cosmic_text as cosmic_text;
 use floem_cosmic_text::TextLayout;
-use image::DynamicImage;
 use peniko::{
     kurbo::{Affine, Point, Rect, Shape},
     BrushRef,
@@ -14,8 +13,7 @@ pub struct Svg<'a> {
 }
 
 pub struct Img<'a> {
-    pub img: &'a DynamicImage,
-    pub data: &'a [u8],
+    pub img: vello::peniko::Image,
     pub hash: &'a [u8],
 }
 
@@ -49,5 +47,5 @@ pub trait Renderer {
 
     fn draw_img(&mut self, img: Img<'_>, rect: Rect);
 
-    fn finish(&mut self) -> Option<DynamicImage>;
+    fn finish(&mut self) -> Option<vello::peniko::Image>;
 }
