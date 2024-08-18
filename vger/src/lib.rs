@@ -16,7 +16,7 @@ use vello::peniko::{
 };
 use vello::peniko::{Blob, Fill};
 pub use vello::Scene;
-use vello::{wgpu, AaConfig, RendererOptions};
+use vello::{wgpu, AaConfig, DebugLayers, RendererOptions};
 use wgpu::{
     Backends, Device, DeviceType, Queue, Surface, SurfaceConfiguration, TextureAspect,
     TextureFormat,
@@ -215,16 +215,30 @@ impl Renderer for VelloRenderer {
     }
 
     fn fill<'b>(&mut self, path: &impl Shape, brush: impl Into<BrushRef<'b>>, blur_radius: f64) {
+        let brush: BrushRef<'b> = brush.into();
         if blur_radius > 0. {
-            return;
+            let color = match brush {
+                BrushRef::Solid(c) => c,
+                _ => return,
+            };
+            let rect = path.as_rounded_rect().unwrap_or_default().rect();
+
+            self.scene.draw_blurred_rounded_rect(
+                self.transform.then_scale(self.scale),
+                rect,
+                color,
+                blur_radius,
+                20.,
+            );
+        } else {
+            self.scene.fill(
+                vello::peniko::Fill::NonZero,
+                self.transform.then_scale(self.scale),
+                brush,
+                None,
+                path,
+            );
         }
-        self.scene.fill(
-            vello::peniko::Fill::NonZero,
-            self.transform.then_scale(self.scale),
-            brush,
-            None,
-            path,
-        );
     }
 
     fn draw_text(&mut self, layout: &TextLayout, pos: impl Into<Point>) {
@@ -436,6 +450,7 @@ impl Renderer for VelloRenderer {
                             width: self.config.width,
                             height: self.config.height,
                             antialiasing_method: vello::AaConfig::Area,
+                            debug: DebugLayers::none(),
                         },
                     )
                     .unwrap();
@@ -491,6 +506,7 @@ impl VelloRenderer {
                     width: self.config.width * self.scale as u32,
                     height: self.config.height * self.scale as u32,
                     antialiasing_method: AaConfig::Area,
+                    debug: DebugLayers::none(),
                 },
             )
             .unwrap();

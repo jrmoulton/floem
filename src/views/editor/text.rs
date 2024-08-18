@@ -4,6 +4,7 @@ use crate::{
     keyboard::Modifiers,
     peniko::Color,
     reactive::{RwSignal, Scope},
+    style,
     text::{Attrs, AttrsList, FamilyOwned, Stretch, Weight},
     views::EditorCustomStyle,
 };

@@ -16,6 +16,8 @@ raw-window-handle = { workspace = true }
 futures = "0.3.26"
 anyhow = "1.0.69"
 swash = "0.1.8"
-vello = { version = "0.2.1" }
-vello_svg = { version = "*" }
+# vello = { version = "0.2.1" }
+vello = { path = "../../vello/vello" }
+# vello_svg = { version = "*" }
+vello_svg = { path = "../../vello_svg" }
 floem_renderer = { path = "../renderer", version = "0.1.0" }

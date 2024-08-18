@@ -243,11 +243,18 @@ pub(crate) fn default_theme() -> Theme {
         })
         .class(ToggleButtonClass, |_| toggle_button_style)
         .class(SliderClass, |s| {
-            s.set(Foreground, Brush::Solid(Color::DARK_GRAY))
-                .height(15)
-                .width(100)
-                .set(slider::EdgeAlign, true)
-                .set(slider::HandleRadius, PxPct::Pct(100.))
+            s.apply_custom(
+                slider::SliderCustomStyle::new()
+                    .bar_color(Color::BLACK)
+                    .bar_radius(100.pct())
+                    .accent_bar_color(Color::GREEN)
+                    .accent_bar_radius(100.pct())
+                    .handle_color(Brush::Solid(Color::DARK_GRAY))
+                    .handle_radius(100.pct())
+                    .edge_align(true),
+            )
+            .height(15)
+            .width(100)
         })
         .class(PlaceholderTextClass, |s| {
             s.color(Color::rgba8(158, 158, 158, 30))

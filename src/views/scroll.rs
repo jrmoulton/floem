@@ -1,7 +1,7 @@
 use floem_reactive::create_effect;
 use floem_renderer::Renderer;
 use peniko::kurbo::{Point, Rect, Size, Stroke, Vec2};
-use peniko::Color;
+use peniko::{Brush, Color};
 
 use crate::style::CustomStylable;
 use crate::unit::PxPct;
