@@ -16,7 +16,7 @@ use crate::{
     view::View,
     Clipboard,
 };
-use floem_reactive::create_updater;
+use floem_reactive::{create_updater, SignalGet};
 use floem_renderer::{text::Cursor, Renderer};
 use floem_winit::keyboard::{Key, SmolStr};
 use peniko::Color;
@@ -93,6 +93,10 @@ impl Label {
         self.available_text_layout
             .as_ref()
             .unwrap_or_else(|| self.text_layout.as_ref().unwrap())
+    }
+
+    pub fn new_read<S: Display + 'static + Clone>(label: impl SignalGet<S> + 'static) -> Label {
+        self::label(move || label.get())
     }
 }
 

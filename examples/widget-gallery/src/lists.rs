@@ -4,9 +4,8 @@ use floem::{
     style::JustifyContent,
     text::Weight,
     views::{
-        button, container, h_stack, h_stack_from_iter, label, list, scroll, stack, v_stack,
-        v_stack_from_iter, virtual_list, Checkbox, Decorators, VirtualDirection, VirtualItemSize,
-        VirtualVector,
+        button, container, h_stack, label, list, scroll, stack, v_stack, virtual_list, Checkbox,
+        Decorators, StackExt, VirtualDirection, VirtualItemSize, VirtualVector,
     },
     IntoView,
 };
@@ -61,7 +60,7 @@ fn enhanced_list() -> impl IntoView {
                 container({
                     stack({
                         (
-                            Checkbox::new_get_set(checkbox_state).style(|s| s.margin_left(6)),
+                            Checkbox::new_read_write(checkbox_state).style(|s| s.margin_left(6)),
                             label(move || item.to_string()).style(|s| {
                                 s.margin_left(6).height(32.0).font_size(22.0).items_center()
                             }),
@@ -109,11 +108,9 @@ fn enhanced_list() -> impl IntoView {
 }
 
 fn h_buttons_from_iter() -> impl IntoView {
-    let button_iter = (0..3).map(|i| button(format!("Button {i}")));
-    h_stack_from_iter(button_iter)
+    (0..3).map(|i| button(format!("Button {i}"))).h_stack()
 }
 
 fn v_buttons_from_iter() -> impl IntoView {
-    let button_iter = (0..3).map(|i| button(format!("Button {i}")));
-    v_stack_from_iter(button_iter)
+    (0..3).map(|i| button(format!("Button {i}"))).v_stack()
 }

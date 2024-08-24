@@ -7,7 +7,12 @@ use floem::{
     views::*,
     IntoView,
 };
+use music_player::music_player;
 mod music_player;
+
+fn main() {
+    floem::launch(app_view);
+}
 
 #[derive(Clone, Copy, PartialEq)]
 enum ViewSwitcher {
@@ -24,8 +29,8 @@ impl ViewSwitcher {
 
     fn view(&self, state: RwSignal<Self>) -> impl IntoView {
         match self {
-            ViewSwitcher::One => music_player::music_player().into_any(),
-            ViewSwitcher::Two => view_two(state).into_any(),
+            ViewSwitcher::One => music_player().into_any(),
+            ViewSwitcher::Two => switch_back(state).into_any(),
         }
         .animation(Animation::scale_effect)
         .clip()
@@ -37,30 +42,30 @@ impl ViewSwitcher {
     }
 }
 
-fn main() {
-    floem::launch(app_view);
-}
-
 fn app_view() -> impl IntoView {
     let state = RwSignal::new(ViewSwitcher::One);
 
-    v_stack((
-        button("Switch views").action(move || state.update(|which| which.toggle())),
-        h_stack((
-            dyn_container(move || state.get(), move |which| which.view(state)),
-            empty()
-                .animation(move |a| a.scale_effect().with_duration(|a, d| a.delay(d)))
-                .style(move |s| {
-                    s.size(100, 100)
-                        .border_radius(5)
-                        .background(Color::RED)
-                        .apply_if(state.get() == ViewSwitcher::Two, |s| s.hide())
-                        .apply(box_shadow())
-                }),
-        ))
-        .style(|s| s.items_center().justify_center().flex_wrap(FlexWrap::Wrap)),
-    ))
-    .style(|s| {
+    let switch_button = button("Switch views").action(move || {
+        state.update(|s| s.toggle());
+    });
+
+    let animated_switcher = dyn_container(move || state.get(), move |which| which.view(state));
+
+    let red_rect = empty()
+        .animation(move |a| a.scale_effect().with_duration(|a, d| a.delay(d)))
+        .style(move |s| {
+            s.size(100, 100)
+                .border_radius(5)
+                .background(Color::RED)
+                .apply_if(state.get() == ViewSwitcher::Two, |s| s.hide())
+                .apply(box_shadow())
+        });
+
+    let switcher_and_rect = (animated_switcher, red_rect)
+        .h_stack()
+        .style(|s| s.items_center().justify_center().flex_wrap(FlexWrap::Wrap));
+
+    (switch_button, switcher_and_rect).v_stack().style(|s| {
         s.width_full()
             .height_full()
             .items_center()
@@ -69,7 +74,7 @@ fn app_view() -> impl IntoView {
     })
 }
 
-fn view_two(view: RwSignal<ViewSwitcher>) -> impl IntoView {
+fn switch_back(view: RwSignal<ViewSwitcher>) -> impl IntoView {
     v_stack((
         "Another view",
         button("Switch back").action(move || view.set(ViewSwitcher::One)),

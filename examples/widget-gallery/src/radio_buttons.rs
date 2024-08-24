@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use floem::{
-    reactive::RwSignal,
+    reactive::{RwSignal, SignalGet},
     style_class,
     views::{Decorators, RadioButton, StackExt as _},
     IntoView,
@@ -36,21 +36,21 @@ pub fn radio_buttons_view() -> impl IntoView {
         (
             form_item("Radio Buttons:".to_string(), width, move || {
                 OperatingSystem::iter()
-                    .map(move |os| RadioButton::new_get_set(os, operating_system))
+                    .map(move |os| RadioButton::new_rw(os, operating_system))
                     .v_stack()
                     .class(RadioButtonGroupClass)
             }),
             form_item("Disabled Radio Buttons:".to_string(), width, move || {
                 OperatingSystem::iter()
-                    .map(move |os| RadioButton::new_get(os, operating_system).disabled(|| true))
+                    .map(move |os| {
+                        RadioButton::new(os, move || operating_system.get()).disabled(|| true)
+                    })
                     .v_stack()
                     .class(RadioButtonGroupClass)
             }),
             form_item("Labelled Radio Buttons:".to_string(), width, move || {
                 OperatingSystem::iter()
-                    .map(move |os| {
-                        RadioButton::new_labeled_get_set(os, operating_system, move || os)
-                    })
+                    .map(move |os| RadioButton::new_labeled_rw(os, operating_system, move || os))
                     .v_stack()
                     .class(RadioButtonGroupClass)
             }),
@@ -60,7 +60,7 @@ pub fn radio_buttons_view() -> impl IntoView {
                 move || {
                     OperatingSystem::iter()
                         .map(move |os| {
-                            RadioButton::new_labeled_get(os, operating_system, move || os)
+                            RadioButton::new_labeled(os, move || operating_system.get(), move || os)
                                 .disabled(|| true)
                         })
                         .v_stack()

@@ -25,9 +25,10 @@ pub const PLAY: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2
 </svg>
 "#;
 pub const PAUSE: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6">
-  <path fill-rule="evenodd" d="M6.75 5.25a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H7.5a.75.75 0 0 1-.75-.75V5.25Zm7.5 0A.75.75 0 0 1 15 4.5h1.5a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H15a.75.75 0 0 1-.75-.75V5.25Z" clip-rule="evenodd" />
+  <path fill-rule="evenodd" d="M6.5 4.5a1 1 0 0 1 1-1H9a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H7.5a1 1 0 0 1-1-1V4.5Zm7.5 0a1 1 0 0 1 1-1h1.5a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H15a1 1 0 0 1-1-1V4.5Z" clip-rule="evenodd" />
 </svg>
 "#;
+
 // pub const FORWARD: &str = r#"b<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6">
 //   <path d="M5.055 7.06C3.805 6.347 2.25 7.25 2.25 8.69v8.122c0 1.44 1.555 2.343 2.805 1.628L12 14.471v2.34c0 1.44 1.555 2.343 2.805 1.628l7.108-4.061c1.26-.72 1.26-2.536 0-3.256l-7.108-4.061C13.555 6.346 12 7.249 12 8.689v2.34L5.055 7.061Z" />
 // </svg>

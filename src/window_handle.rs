@@ -1216,7 +1216,7 @@ fn context_menu_view(
 
     use crate::{
         app::{add_app_update_event, AppUpdateEvent},
-        views::{dyn_stack, empty, svg, text},
+        views::{dyn_stack, dyn_svg, empty, text},
     };
 
     #[derive(Clone, PartialEq, Eq, Hash)]
@@ -1287,7 +1287,7 @@ fn context_menu_view(
                             text(title),
                             svg(submenu_svg).style(move |s| {
                                 s.size(20.0, 20.0)
-                                    .color(Color::rgb8(201, 201, 201))
+                                    .text_color(Color::rgb8(201, 201, 201))
                                     .margin_right(10.0)
                                     .margin_left(20.0)
                                     .apply_if(!has_submenu, |s| s.hide())
@@ -1342,7 +1342,7 @@ fn context_menu_view(
                                 .active(|s| {
                                     s.border_radius(10.0).background(Color::rgb8(92, 92, 92))
                                 })
-                                .disabled(|s| s.color(Color::rgb8(92, 92, 92)))
+                                .disabled(|s| s.text_color(Color::rgb8(92, 92, 92)))
                         }),
                         dyn_stack(
                             move || children.clone().unwrap_or_default(),
@@ -1482,7 +1482,7 @@ fn context_menu_view(
             .flex_col()
             .border_radius(10.0)
             .background(Color::rgb8(44, 44, 44))
-            .color(Color::rgb8(201, 201, 201))
+            .text_color(Color::rgb8(201, 201, 201))
             .z_index(999)
             .line_height(2.0)
             .padding(5.0)

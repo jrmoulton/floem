@@ -1,19 +1,19 @@
 use floem::{
     keyboard::{Key, Modifiers, NamedKey},
     peniko::Color,
-    reactive::{create_signal, SignalGet, SignalUpdate},
+    reactive::{RwSignal, SignalUpdate},
     unit::UnitExt,
-    views::{dyn_view, Decorators, LabelClass, LabelCustomStyle},
+    views::{button, dyn_view, stack, Decorators, LabelClass, LabelCustomStyle},
     IntoView, View,
 };
 
 fn app_view() -> impl IntoView {
-    let (counter, set_counter) = create_signal(0);
+    let mut counter = RwSignal::new(0);
     let view = (
-        dyn_view(move || format!("Value: {}", counter.get())),
+        dyn_view(move || format!("Value: {}", counter)),
         counter.style(|s| s.padding(10.0)),
-        (
-            "Increment"
+        stack((
+            button("Increment")
                 .style(|s| {
                     s.border_radius(10.0)
                         .padding(10.0)
@@ -23,17 +23,13 @@ fn app_view() -> impl IntoView {
                         .hover(|s| s.background(Color::LIGHT_GREEN))
                         .active(|s| s.color(Color::WHITE).background(Color::DARK_GREEN))
                 })
-                .on_click_stop({
-                    move |_| {
-                        set_counter.update(|value| *value += 1);
-                    }
+                .action(move || {
+                    counter += 1;
                 })
                 .keyboard_navigatable(),
-            "Decrement"
-                .on_click_stop({
-                    move |_| {
-                        set_counter.update(|value| *value -= 1);
-                    }
+            button("Decrement")
+                .action(move || {
+                    counter -= 1;
                 })
                 .style(|s| {
                     s.box_shadow_blur(5.0)
@@ -46,12 +42,12 @@ fn app_view() -> impl IntoView {
                         .active(|s| s.color(Color::WHITE).background(Color::RED))
                 })
                 .keyboard_navigatable(),
-            "Reset to 0"
-                .on_click_stop(move |_| {
+            button("Reset to 0")
+                .action(move || {
                     println!("Reset counter pressed"); // will not fire if button is disabled
-                    set_counter.update(|value| *value = 0);
+                    counter.set(0);
                 })
-                .disabled(move || counter.get() == 0)
+                .disabled(move || counter == 0)
                 .style(|s| {
                     s.box_shadow_blur(5.0)
                         .border_radius(10.0)
@@ -64,12 +60,12 @@ fn app_view() -> impl IntoView {
                         .active(|s| s.color(Color::WHITE).background(Color::YELLOW_GREEN))
                 })
                 .keyboard_navigatable(),
-        )
-            .style(|s| {
-                s.class(LabelClass, |s| {
-                    s.apply(LabelCustomStyle::new().selectable(false).style())
-                })
-            }),
+        ))
+        .style(|s| {
+            s.class(LabelClass, |s| {
+                s.apply(LabelCustomStyle::new().selectable(false).style())
+            })
+        }),
     )
         .style(|s| {
             s.size(100.pct(), 100.pct())

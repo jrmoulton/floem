@@ -1240,7 +1240,7 @@ impl Style {
                                     .unwrap()
                                     .apply_mut(v.clone());
                             }
-                            None => {
+                            Option::None => {
                                 let mut current =
                                     e.get_mut().downcast_ref::<Style>().unwrap().clone();
                                 current.apply_mut(v.clone());

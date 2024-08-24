@@ -76,6 +76,7 @@ impl<T: 'static> RwSignal<T> {
 }
 
 /// Creates a new RwSignal which can act both as a setter and a getter.
+///
 /// Accessing the signal value in an Effect will make the Effect subscribe
 /// to the value change of the Signal. And whenever the signal value changes,
 /// it will trigger an effect run.
@@ -136,6 +137,7 @@ impl<T> PartialEq for WriteSignal<T> {
 }
 
 /// Creates a new setter and getter Signal.
+///
 /// Accessing the signal value in an Effect will make the Effect subscribe
 /// to the value change of the Signal. And whenever the signal value changes,
 /// it will trigger an effect run.
@@ -302,6 +304,11 @@ impl<T> SignalUpdate<T> for WriteSignal<T> {
 }
 
 impl<T> SignalWrite<T> for WriteSignal<T> {
+    fn id(&self) -> Id {
+        self.id
+    }
+}
+impl<T> SignalWrite<T> for RwSignal<T> {
     fn id(&self) -> Id {
         self.id
     }

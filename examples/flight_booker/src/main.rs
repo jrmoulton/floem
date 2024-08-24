@@ -66,7 +66,7 @@ pub fn app_view() -> impl IntoView {
     let did_booking = create_rw_signal(false);
 
     let mode_picker = FlightMode::iter()
-        .map(move |fm| RadioButton::new_labeled_get_set(fm, flight_mode, move || fm))
+        .map(move |fm| RadioButton::new_labeled_rw(fm, flight_mode, move || fm))
         .h_stack();
 
     let start_date_input = text_input(start_text)
