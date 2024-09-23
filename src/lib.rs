@@ -34,7 +34,7 @@
 //!
 //! You can create a reactive signal anywhere in the program using [`RwSignal::new()`](floem_reactive::RwSignal::new) and [`RwSignal::new_split()`](floem_reactive::RwSignal::new_split) or use a [different signal type](floem_reactive).
 //!
-//! When you use a signal in a reactive context and call [`get`](floem_reactive::SignalGet::get) or [`with`](floem_reactive::SignalWith::with), (which are also called when you use an operator such as `==`)
+//! When you use a signal in a reactive context and call the [`get`](floem_reactive::SignalGet::get) or [`with`](floem_reactive::SignalWith::with) methods, (which are also called when you use an operator such as `==`)
 //! the runtime will automatically subscribe the correct side effects
 //! to changes in that signal, creating reactivity. To the programmer this is transparent. The reactivity
 //! "just works" when you access the value where you want to use it.
@@ -43,15 +43,15 @@
 //! ```
 //! # use floem::reactive::*;
 //! # use floem::IntoView;
-//! # use floem::views::{label, v_stack, text_input, Decorators};
+//! # use floem::views::*;
 //! #
 //! fn app_view() -> impl IntoView {
 //!     let text = RwSignal::new("Hello world".to_string());
 //!
-//!     v_stack((
-//!         text_input(text),
-//!         label(move || text.get()),
-//!     ))
+//!     let input = text_input(text);
+//!     let label_view = label(move || text);
+//!
+//!     v_stack((input, label_view))
 //! }
 //! ```
 //!
@@ -66,7 +66,6 @@
 //! Floem has a powerful built-in style system that allows you to customize the appearance of your UI.
 //!
 //! Example:
-//!
 //! ```
 //! #  use floem::peniko::Color;
 //! #  use floem::reactive::*;
@@ -80,7 +79,7 @@
 //!
 //! let active_tab = RwSignal::new(0);
 //!
-//! // The following closure will be automatically re-run any time `active_tab` is set.
+//! // The following closure inside `style` will be automatically re-run any time `active_tab` is set.
 //! text("Some text").style(move |s| {
 //!     s.width(75)
 //!         .font_size(21.)
@@ -95,18 +94,26 @@
 //! [`Style`](crate::style::Style) value using the builder pattern. Through this value, you can access methods that modify a variety
 //! of familiar properties such as width, padding, and background. Some `Style` properties
 //! such as font size are `inherited` and will apply to all of a view's children until overriden.
-//!
 // TODO: Add links on these
+//!
 //! In this same style value, floem supports:
-//!     adding custom properties, applying styles conditionally, property transitions, defining styles on different interaction states, themeing with classes, and more.
+//!     adding custom properties, applying styles [conditionally](style::Style::apply_if), [property transitions](style::Style::transition), defining styles on different [interaction states](style::Style::hover), themeing with [classes](style::Style::class), and more.
 //!
 //! For additional information about styling, [see here](crate::style).
 //!
 //! ## Animation
 //!
-//! Floem has a full keyframe animation system that allows you to animate any property that can be interpolated and builds on the capabilities and ergonomics of the style system.
+//! In addition to [property transitions](style::Style::transition) that can be added to `Style`s,
+//! Floem has a full keyframe animation system that allows you to animate any property that can be [interpolated](style::StylePropValue::interpolate) and builds on the capabilities and ergonomics of the style system.
 //!
 //! Example:
+//!
+//! Animations in Floem, by default, have keyframes ranging from 0-100.
+//!
+//! - The first keyframe will use the computed style, which will include the red background with size of 500x100.
+//! - At 50%, the animation will animate to a black square of 30x30 with a bezier easing of ease_in.
+//! - At 100% the animation will animate to an aquamarine rectangle of 10x300 with an bezier easing of ease_out.
+//! - The animation will then automatically repeat and will repeat forever.
 //!
 //! ```
 //! #  use floem::peniko::Color;
@@ -120,6 +127,7 @@
 //!     .style(|s| s.background(Color::RED).size(500, 100))
 //!     .animation(move |a| {
 //!         a.duration(5.seconds())
+//!             .keyframe(0, |kf| kf.computed_style())
 //!             .keyframe(50, |kf| {
 //!                 kf.style(|s| s.background(Color::BLACK).size(30, 30))
 //!                     .ease_in()
@@ -129,23 +137,14 @@
 //!                     .ease_out()
 //!             })
 //!             .repeat(true)
-//!             .auto_reverse(true)
 //!     });
-//!
 //! ```
 //!
-//! You can add aninimations to a View instance by calling the [`animation`](crate::views::Decorators::animation) method.
+//! You can add aninimations to a View instance by calling the [`animation`](crate::views::Decorators::animation) method from the `Decorators` trait.
 //! The `animation` method takes a closure that takes and returns an [`Animation`](crate::animate::Animation) value using the builder pattern.
 //!
-//! In this same style value floem supports:
-//!     adding custom properties, applying styles conditionally, property transitions, defining styles on different interaction states, themeing with classes, and more.
-//!
-//! For additional information about styling, [see here](crate::style).
-//!
-//!
-//! ## Additional reading
-//!
-//!
+//! For additional information about animation, [see here](crate::animate::Animation).
+
 pub mod action;
 pub mod animate;
 mod app;
@@ -154,6 +153,7 @@ pub(crate) mod app_state;
 mod clipboard;
 pub mod context;
 pub mod dropped_file;
+pub mod easing;
 pub mod event;
 pub mod ext_event;
 pub mod file;

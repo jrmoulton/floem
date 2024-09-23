@@ -1,5 +1,9 @@
+#![deny(missing_docs)]
+
+//! Animations
+
 use crate::{
-    animate::{AnimState, AnimStateCommand, AnimStateKind, Bezier, Easing, Linear, Spring},
+    easing::*,
     style::{Style, StylePropRef},
     view_state::StackOffset,
     ViewId,
@@ -18,7 +22,7 @@ use web_time::{Duration, Instant};
 /// Holds a resolved prop, along with the associated frame id and easing function
 #[derive(Clone, Debug)]
 pub struct KeyFrameProp {
-    // the style prop value. This will either come from an animation frame or it will be pulled from the computed style
+    // the style prop value. This will either come from an animation frameor it will be pulled from the computed style
     val: Rc<dyn Any>,
     // the frame id
     id: u16,
@@ -29,8 +33,9 @@ pub struct KeyFrameProp {
 /// Defines whether the style in a key frame should be stored in the frame or it it should be pulled from the computed style
 #[derive(Clone, Debug)]
 pub enum KeyFrameStyle {
-    // when computed, props will be pulled from the computed style
+    /// when computed style, props will be pulled from the computed style
     Computed,
+    /// When using style, the props will be stored in the key frame
     Style(Style),
 }
 impl From<Style> for KeyFrameStyle {
@@ -50,6 +55,7 @@ pub struct KeyFrame {
     easing: Rc<dyn Easing>,
 }
 impl KeyFrame {
+    /// Create a new keyframe with the given id
     pub fn new(id: u16) -> Self {
         Self {
             id,
@@ -69,7 +75,7 @@ impl KeyFrame {
     }
 
     /// Set this keyframe to pull its props from the computed style. The will completely overwrite any previously applied styles to this keyframe.
-    pub fn computed(mut self) -> Self {
+    pub fn computed_style(mut self) -> Self {
         self.style = KeyFrameStyle::Computed;
         self
     }
@@ -276,9 +282,73 @@ pub enum RepeatMode {
     Times(usize),
 }
 
+#[derive(Debug, Clone)]
+pub(crate) enum AnimState {
+    Idle,
+    Stopped,
+    Paused {
+        elapsed: Option<Duration>,
+    },
+    /// How many passes(loops) there will be is controlled by the [`RepeatMode`] of the animation.
+    /// By default, the animation will only have a single pass,
+    /// but it can be set to [`RepeatMode::LoopForever`] to loop indefinitely.
+    PassInProgress {
+        started_on: Instant,
+        elapsed: Duration,
+    },
+    ExtMode {
+        started_on: Instant,
+        elapsed: Duration,
+    },
+    /// Depending on the [`RepeatMode`] of the animation, we either go back to `PassInProgress`
+    /// or advance to `Completed`.
+    PassFinished {
+        elapsed: Duration,
+        was_in_ext: bool,
+    },
+    // NOTE: If animation has `RepeatMode::LoopForever`, this state will never be reached.
+    Completed {
+        elapsed: Option<Duration>,
+    },
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+/// Represents the different states an animation can be in.
+pub enum AnimStateKind {
+    /// The animation is idle and has not started yet.
+    Idle,
+    /// The animation is paused and can be resumed.
+    Paused,
+    /// The animation is stopped and cannot be resumed.
+    Stopped,
+    /// The animation is currently in progress.
+    ///
+    /// In this state the animation is actively animating the properties of the view.
+    PassInProgress,
+    /// The animation has finished a pass but may repeat based on the repeat mode.
+    PassFinished,
+    /// The animation has completed all its passes and will not run again until started.
+    Completed,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+/// Commands to control the state of an animation
+pub enum AnimStateCommand {
+    /// Pause the animation
+    Pause,
+    /// Resume the animation
+    Resume,
+    /// Start the animation
+    Start,
+    /// Stop the animation
+    Stop,
+}
+
 type EffectStateVec = SmallVec<[RwSignal<SmallVec<[(ViewId, StackOffset<Animation>); 1]>>; 1]>;
 
-/// An animation struct. Use [Animation::new] or the `.animate()` method from the decorators trait to build an animation.
+/// The main animation struct
+///
+/// Use [Animation::new] or the [Decorators::animation](crate::views::Decorators::animation) method to build an animation.
 #[derive(Debug, Clone)]
 pub struct Animation {
     pub(crate) state: AnimState,
@@ -345,18 +415,20 @@ impl Animation {
     }
 
     /// Quickly set a few properties on an animation to set up an animation to be used as a view transition (on creation and removal).
+    /// (Sets keyframes 0 and 100 to use the computed style until overriden)
     pub fn view_transition(self) -> Self {
         self.run_on_create(true)
             .run_on_remove(true)
             .initial_state(AnimStateCommand::Stop)
-            .keyframe(0, |kf| kf.computed().ease(Spring::gentle()))
-            .keyframe(100, |kf| kf.computed().ease(Spring::gentle()))
+            .keyframe(0, |kf| kf.computed_style().ease(Spring::gentle()))
+            .keyframe(100, |kf| kf.computed_style().ease(Spring::gentle()))
     }
 
+    /// Quickly set an animation to be a view transition and override the default easing function on keyframes 0 and 100.
     pub fn view_transition_with_ease(self, ease: impl Easing + 'static + Clone) -> Self {
         self.view_transition()
-            .keyframe(0, |kf| kf.computed().ease(ease.clone()))
-            .keyframe(100, |kf| kf.computed().ease(ease.clone()))
+            .keyframe(0, |kf| kf.computed_style().ease(ease.clone()))
+            .keyframe(100, |kf| kf.computed_style().ease(ease.clone()))
     }
 
     /// Quickly set an animation to be a view transition and set the animation to animate from size(0, 0) to the "normal" computed style of a view (the view with no animations applied).
@@ -513,6 +585,7 @@ impl Animation {
         self
     }
 
+    /// Set whether the properties from the final keyframe of this animation should be applied even when the animation is finished.
     pub fn apply_when_finished(mut self, apply: bool) -> Self {
         self.apply_when_finished = apply;
         self
@@ -639,6 +712,7 @@ impl Animation {
         )
     }
 
+    /// Add a debug description to the animation
     pub fn debug_name(mut self, description: impl Into<String>) -> Self {
         match &mut self.debug_description {
             Some(inner_desc) => {
@@ -669,6 +743,7 @@ impl Animation {
         self.transition(AnimStateCommand::Stop)
     }
 
+    /// Matches the current state of the animation and returns the kind of state it is in.
     pub fn state_kind(&self) -> AnimStateKind {
         match self.state {
             AnimState::Idle => AnimStateKind::Idle,
@@ -681,6 +756,7 @@ impl Animation {
         }
     }
 
+    /// Returns the current amount of time that has elapsed since the animation started.
     pub fn elapsed(&self) -> Option<Duration> {
         match &self.state {
             AnimState::Idle => None,
@@ -1052,22 +1128,27 @@ impl Animation {
         }
     }
 
+    /// returns `true` if the animation is in the idle state
     pub fn is_idle(&self) -> bool {
         self.state_kind() == AnimStateKind::Idle
     }
 
+    /// returns `true` if the animation is in the pass in progress state
     pub fn is_in_progress(&self) -> bool {
         self.state_kind() == AnimStateKind::PassInProgress
     }
 
+    /// returns `true` if the animation is in the completed state
     pub fn is_completed(&self) -> bool {
         self.state_kind() == AnimStateKind::Completed
     }
 
+    /// returns `true` if the animation is in the stopped state
     pub fn is_stopped(&self) -> bool {
         self.state_kind() == AnimStateKind::Stopped
     }
 
+    /// returns true if the animation can advance, which either means the animation will transition states, or properties can be animated and updated
     pub fn can_advance(&self) -> bool {
         match self.state_kind() {
             AnimStateKind::PassFinished | AnimStateKind::PassInProgress | AnimStateKind::Idle => {
@@ -1077,7 +1158,15 @@ impl Animation {
         }
     }
 
-    pub fn should_apply_folded(&self) -> bool {
+    /// returns true if the animation should auto reverse
+    pub fn is_auto_reverse(&self) -> bool {
+        self.auto_reverse
+    }
+
+    /// returns true if the internal folded style of the animation should be applied.
+    ///
+    /// This is used when the animation cannot advance but the folded style should still be applied.
+    pub(crate) fn should_apply_folded(&self) -> bool {
         self.apply_when_finished
             || match self.state_kind() {
                 AnimStateKind::Paused => true,
@@ -1087,9 +1176,5 @@ impl Animation {
                 | AnimStateKind::PassFinished
                 | AnimStateKind::Completed => false,
             }
-    }
-
-    pub fn is_auto_reverse(&self) -> bool {
-        self.auto_reverse
     }
 }
