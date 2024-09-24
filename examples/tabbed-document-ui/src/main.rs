@@ -69,9 +69,9 @@ fn app_view() -> impl IntoView {
 
                 println!("New pressed");
 
-                let app_state: Arc<Mutex<ApplicationState>> = use_context().unwrap();
+                let app_state: Arc<ApplicationState> = use_context().unwrap();
 
-                app_state.lock().unwrap().tabs.update(|tabs|{
+                app_state.tabs.update(|tabs|{
                     tabs.insert(
                         TabId("home-tab-id".to_string()),
                         TabKind::Home(HomeTab {})
@@ -87,9 +87,9 @@ fn app_view() -> impl IntoView {
             ),
         dyn_stack(
             move || {
-                let app_state: Option<Arc<Mutex<ApplicationState>>> = use_context();
+                let app_state: Option<Arc<ApplicationState>> = use_context();
 
-                app_state.unwrap().lock().unwrap().tabs.get()
+                app_state.unwrap().tabs.get()
             },
             move |(tab_id, _tab_kind)| tab_id.clone(),
             move|(tab_id, tab_kind)| {
@@ -119,7 +119,7 @@ fn main() {
         show_home_on_startup: false,
     };
 
-    provide_context(Arc::new(Mutex::new(app_state)));
+    provide_context(Arc::new(app_state));
 
     floem::launch(app_view);
 }
