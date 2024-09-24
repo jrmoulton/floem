@@ -1,11 +1,13 @@
 use floem::{
     peniko::{Brush, Color},
     reactive::{RwSignal, SignalGet, SignalUpdate},
-    style::{Background, PaddingBottom, PaddingLeft, PaddingRight, PaddingTop, Style, Transition},
-    taffy::AlignItems,
+    style::{ScaleX, ScaleY, Style, Transition},
     text::Weight,
-    unit::DurationUnitExt,
-    views::*,
+    unit::{DurationUnitExt, UnitExt},
+    views::{
+        container, dyn_container, empty, h_stack, slider, svg, v_stack, ButtonClass, Decorators,
+        Stack, SvgClass,
+    },
     AnyView, IntoView,
 };
 
@@ -94,80 +96,35 @@ pub fn music_player() -> impl IntoView {
         .container()
         .on_click_stop(move |_| play_pause_state.update(|s| s.toggle()));
 
-    let back_button = svg(svg::BACKWARD).container().class(ButtonClass);
-    let forward_button = svg(svg::BACKWARD).container().class(ButtonClass);
-
-    let media_buttons = (back_button, play_pause_button, forward_button)
-        .h_stack()
-        .style(|s| {
-            s.align_self(Some(AlignItems::Center))
-                .items_center()
-                .gap(20)
-                .class(SvgClass, |s| s.color(MUSIC_ICON))
-        });
-
-    let song_info_view = dyn_container(move || song_info.get(), |info| info);
-
-    let progress_slider = slider::slider(move || 40.)
-        .style(|s| s.width_full())
-        .slider_style(|s| {
-            s.bar_height(3)
-                .accent_bar_height(3.)
-                .bar_color(SLIDER)
-                .accent_bar_color(ICON)
-                .handle_color(Brush::Solid(Color::TRANSPARENT))
-                .handle_radius(0)
-        });
-
-    let card = (now_playing, song_info_view, progress_slider, media_buttons)
-        .v_stack()
-        .style(|s| {
-            s.background(BACKGROUND)
-                .size_full()
-                .border_radius(8)
-                .padding(15)
-                .gap(10)
-                .width(300)
-                .apply(box_shadow())
-        });
-
-    let svg_style = |s: Style| {
-        s.size(20, 20)
-            .inset_top(0.7)
-            .inset_right(0.7)
-            .items_center()
-            .justify_center()
-            .flex_shrink(2.)
-            .transition_color(Transition::spring(25.millis()))
-    };
-
     let button_style = |s: Style| {
         s.border(0)
             .padding(5)
             .items_center()
             .justify_center()
             .background(Color::TRANSPARENT)
-            .transition(PaddingBottom, Transition::spring(25.millis()))
-            .transition(PaddingTop, Transition::spring(25.millis()))
-            .transition(PaddingLeft, Transition::spring(25.millis()))
-            .transition(PaddingRight, Transition::spring(25.millis()))
             .hover(|s| s.background(SLIDER))
             .active(|s| {
-                s.set_style_value(Background, floem::style::StyleValue::Unset)
-                    .padding(10)
-                    .class(SvgClass, |s| s.color(ICON))
+                s.class(SvgClass, |s| {
+                    s.color(ICON).scale_x(50.pct()).scale_y(50.pct())
+                })
             })
     };
 
-    let card_style = move |s: Style| {
+    container(card).style(move |s| {
         s.size(300, 175)
             .items_center()
             .justify_center()
             .font_size(FONT_SIZE)
             .color(TEXT_COLOR)
-            .class(SvgClass, svg_style)
+            .class(SvgClass, |s| {
+                s.size(20, 20)
+                    .items_center()
+                    .justify_center()
+                    .scale(100.pct())
+                    .transition(ScaleX, Transition::spring(50.millis()))
+                    .transition(ScaleY, Transition::spring(50.millis()))
+                    .transition_color(Transition::linear(50.millis()))
+            })
             .class(ButtonClass, button_style)
-    };
-
-    card.container().style(card_style)
+    })
 }
