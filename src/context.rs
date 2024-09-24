@@ -1163,6 +1163,9 @@ impl<'a> PaintCx<'a> {
                 x: -center_x,
                 y: -center_y,
             });
+
+            // let rotation = view_state.borrow().layout_props.rotation().0;
+            // self.transform *= Affine::rotate(rotation);
             self.paint_state.renderer_mut().transform(self.transform);
 
             if let Some(rect) = self.clip.as_mut() {
