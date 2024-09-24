@@ -1,10 +1,9 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use floem::{IntoView, View};
+use std::sync::Arc;
+use floem::IntoView;
 use floem::peniko::Color;
 use floem::reactive::{create_rw_signal, provide_context, RwSignal, SignalGet, SignalUpdate, use_context};
-use floem::view_tuple::ViewTuple;
-use floem::views::{button, Decorators, dyn_stack, empty, h_stack, label, v_stack};
+use floem::views::{button, Decorators, dyn_stack, h_stack, label, v_stack};
 use crate::documents::image::ImageDocument;
 use crate::documents::text::TextDocument;
 
@@ -92,7 +91,7 @@ fn app_view() -> impl IntoView {
                 app_state.unwrap().tabs.get()
             },
             move |(tab_id, _tab_kind)| tab_id.clone(),
-            move|(tab_id, tab_kind)| {
+            move |(_tab_id, tab_kind)| {
                 match tab_kind {
                     TabKind::Home(_home_tab) => {
                         label(||"Home")
@@ -113,7 +112,7 @@ fn app_view() -> impl IntoView {
 
 fn main() {
 
-    let mut app_state = ApplicationState {
+    let app_state = ApplicationState {
         documents: Default::default(),
         tabs: create_rw_signal(Default::default()),
         show_home_on_startup: false,
