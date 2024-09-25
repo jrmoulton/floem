@@ -4,9 +4,12 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use slotmap::{DefaultKey, SlotMap};
+use floem::action::open_file;
+use floem::event::Event;
+use floem::file::{FileDialogOptions, FileSpec};
 use floem::IntoView;
 use floem::peniko::Color;
-use floem::reactive::{create_rw_signal, provide_context, RwSignal, SignalGet, SignalUpdate, use_context};
+use floem::reactive::{create_rw_signal, provide_context, RwSignal, SignalGet, SignalUpdate, SignalWith, use_context};
 use floem::views::{button, ButtonClass, Decorators, dyn_container, dyn_stack, dyn_view, empty, h_stack, label, v_stack};
 use crate::config::Config;
 use crate::documents::image::ImageDocument;
@@ -14,12 +17,26 @@ use crate::documents::text::TextDocument;
 
 pub mod documents {
     pub mod text {
+        use std::fs;
         use std::path::PathBuf;
 
         pub struct TextDocument {
             path: PathBuf,
             content: String,
             selection: (usize, usize),
+        }
+
+        impl TextDocument {
+            pub fn new(path: PathBuf) -> Self {
+
+                let content = fs::read_to_string(&path).unwrap();
+
+                Self {
+                    path,
+                    content,
+                    selection: (0, 0),
+                }
+            }
         }
     }
 
@@ -45,7 +62,7 @@ struct HomeTab {
 
 #[derive(Clone)]
 struct DocumentTab {
-    id: String,
+    document_key: DefaultKey,
 }
 
 #[derive(Clone)]
@@ -55,13 +72,73 @@ enum TabKind {
 }
 
 struct ApplicationState {
-    documents: HashMap<String, DocumentKind>,
+    documents: RwSignal<SlotMap<DefaultKey, DocumentKind>>,
 
     tabs: RwSignal<SlotMap<DefaultKey, TabKind>>,
 
     active_tab: RwSignal<Option<DefaultKey>>,
 
     config: Config,
+}
+
+fn add_home_pressed(_event: &Event) {
+    println!("Add home pressed");
+
+    let app_state: Arc<ApplicationState> = use_context().unwrap();
+
+    app_state.tabs.update(|tabs|{
+        tabs.insert(
+            TabKind::Home(HomeTab {})
+        );
+    });
+}
+
+fn new_pressed(_event: &Event) {
+    println!("New pressed");
+}
+
+fn open_pressed(_event: &Event) {
+    println!("Open pressed");
+
+    open_file(
+        FileDialogOptions::new()
+            .title("Select a file")
+            .allowed_types(vec![
+                FileSpec {
+                    name: "text",
+                    extensions: &["txt"],
+                },
+                FileSpec {
+                    name: "image",
+                    extensions: &["bmp"],
+                }
+            ]),
+        move |file_info| {
+            if let Some(file) = file_info {
+                println!("Selected file: {:?}", file.path);
+
+
+                let app_state: Arc<ApplicationState> = use_context().unwrap();
+
+                let path = file.path.first().unwrap();
+
+                let text_document = TextDocument::new(path.clone());
+
+                let document = DocumentKind::TextDocument(text_document);
+                let document_key= app_state.documents.try_update(|mut documents|{
+                    documents.insert(document)
+                }).unwrap();
+
+                app_state.tabs.update(|tabs|{
+                    let tab_key = tabs.insert(
+                        TabKind::Document(DocumentTab { document_key })
+                    );
+
+                    app_state.active_tab.set(Some(tab_key));
+                });
+            }
+        },
+    );
 }
 
 fn app_view() -> impl IntoView {
@@ -71,24 +148,9 @@ fn app_view() -> impl IntoView {
         // Toolbar
         //
         h_stack((
-            button(||"Add home").on_click_stop(move |_event|{
-
-                println!("Add home pressed");
-
-                let app_state: Arc<ApplicationState> = use_context().unwrap();
-
-                app_state.tabs.update(|tabs|{
-                    tabs.insert(
-                        TabKind::Home(HomeTab {})
-                    );
-                });
-
-            }),
-            button(||"New").on_click_stop(move |_event|{
-
-                println!("New pressed");
-            }),
-            button(||"Open"),
+            button(||"Add home").on_click_stop(add_home_pressed),
+            button(||"New").on_click_stop(new_pressed),
+            button(||"Open").on_click_stop(open_pressed),
         ))
             .style(|s| s
                 .width_full()
@@ -156,7 +218,6 @@ fn app_view() -> impl IntoView {
                             label(|| "Document Tab Content").into_any()
                         }
                     }
-
                 } else {
                     empty().into_any()
                 }
@@ -192,7 +253,7 @@ fn main() {
     };
 
     let app_state = ApplicationState {
-        documents: Default::default(),
+        documents: create_rw_signal(Default::default()),
         tabs: create_rw_signal(Default::default()),
         active_tab: create_rw_signal(None),
         config,
@@ -200,11 +261,11 @@ fn main() {
 
     if app_state.config.show_home_on_startup {
         app_state.tabs.update(|tabs|{
-            let key = tabs.insert(
+            let tab_key = tabs.insert(
                 TabKind::Home(HomeTab {})
             );
 
-            app_state.active_tab.set(Some(key));
+            app_state.active_tab.set(Some(tab_key));
         })
     }
 
