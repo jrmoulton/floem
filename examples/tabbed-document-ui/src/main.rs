@@ -7,7 +7,7 @@ use slotmap::{DefaultKey, SlotMap};
 use floem::IntoView;
 use floem::peniko::Color;
 use floem::reactive::{create_rw_signal, provide_context, RwSignal, SignalGet, SignalUpdate, use_context};
-use floem::views::{button, Decorators, dyn_stack, h_stack, label, v_stack};
+use floem::views::{button, Decorators, dyn_container, dyn_stack, dyn_view, empty, h_stack, label, v_stack};
 use crate::config::Config;
 use crate::documents::image::ImageDocument;
 use crate::documents::text::TextDocument;
@@ -59,12 +59,17 @@ struct ApplicationState {
 
     tabs: RwSignal<SlotMap<DefaultKey, TabKind>>,
 
+    active_tab: RwSignal<Option<DefaultKey>>,
+
     config: Config,
 }
 
 fn app_view() -> impl IntoView {
 
     v_stack((
+        //
+        // Toolbar
+        //
         h_stack((
             button(||"Add home").on_click_stop(move |_event|{
 
@@ -89,6 +94,10 @@ fn app_view() -> impl IntoView {
                 .width_full()
                 .background(Color::parse("#eeeeee").unwrap())
             ),
+
+        //
+        // Tab bar
+        //
         dyn_stack(
             move || {
                 let app_state: Option<Arc<ApplicationState>> = use_context();
@@ -106,7 +115,36 @@ fn app_view() -> impl IntoView {
                     }
                 }
             }
-        )
+        ),
+        //
+        // Content
+        //
+        dyn_container(
+            move || {
+                let app_state: Option<Arc<ApplicationState>> = use_context();
+                app_state.unwrap().active_tab.get()
+            },
+            move |active_tab| {
+                let app_state: Option<Arc<ApplicationState>> = use_context();
+                if let Some(tab_key) = active_tab {
+                    let tabs = app_state.unwrap().tabs.get();
+                    let tab = tabs.get(tab_key).unwrap();
+
+                    match tab {
+                        TabKind::Home(_) => {
+                            label(|| "Home Tab Content").into_any()
+                        }
+                        TabKind::Document(_) => {
+                            label(|| "Document Tab Content").into_any()
+                        }
+                    }
+
+                } else {
+                    empty().into_any()
+                }
+            }
+        ),
+
     ))
         .style(|s| s
             .width_full()
@@ -138,14 +176,17 @@ fn main() {
     let app_state = ApplicationState {
         documents: Default::default(),
         tabs: create_rw_signal(Default::default()),
+        active_tab: create_rw_signal(None),
         config,
     };
 
     if app_state.config.show_home_on_startup {
         app_state.tabs.update(|tabs|{
-            tabs.insert(
+            let key = tabs.insert(
                 TabKind::Home(HomeTab {})
             );
+
+            app_state.active_tab.set(Some(key));
         })
     }
 
