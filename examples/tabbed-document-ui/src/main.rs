@@ -6,13 +6,13 @@ use floem::file::{FileDialogOptions, FileSpec};
 use floem::IntoView;
 use floem::peniko::Color;
 use floem::reactive::{create_rw_signal, provide_context, RwSignal, SignalGet, SignalUpdate, SignalWith, use_context};
-use floem::views::{button, Decorators, dyn_container, dyn_stack, dyn_view, empty, h_stack, label, v_stack};
+use floem::views::{button, Decorators, dyn_container, dyn_stack, empty, h_stack, v_stack};
 use crate::config::Config;
 use crate::documents::DocumentKind;
 use crate::documents::image::ImageDocument;
 use crate::documents::text::TextDocument;
-use crate::tabs::document::DocumentTab;
-use crate::tabs::home::HomeTab;
+use crate::tabs::document::{DocumentContainer, DocumentTab};
+use crate::tabs::home::{HomeContainer, HomeTab};
 use crate::tabs::TabKind;
 
 pub mod config;
@@ -98,7 +98,11 @@ fn app_view() -> impl IntoView {
                     }
                 }
             }
-        ),
+        )
+            .style(|s| s
+                .width_full()
+                .background(Color::parse("#dddddd").unwrap())
+            ),
         //
         // Content
         //
@@ -113,42 +117,30 @@ fn app_view() -> impl IntoView {
                     println!("displaying tab. tab_id: {:?}", &tab_key);
 
                     let tabs_signal = app_state.tabs;
-                    tabs_signal.with_untracked(|tabs|{
+                    let view = tabs_signal.with_untracked(|tabs|{
                         let tab = tabs.get(tab_key).unwrap().clone();
 
                         match tab {
-                            TabKind::Home(_) => {
-                                v_stack((
-                                    label(|| "Home Tab Content"),
-                                    dyn_view(move ||format!("tab_id: {:?}", &tab_key))
-                                )).into_any()
+                            TabKind::Home(_home_tab) => {
+                                HomeContainer::build_view(tab_key).into_any()
                             }
                             TabKind::Document(document_tab) => {
-                                dyn_container(move ||{
-                                    document_tab.document_key
-                                },
-                                move |document_key|{
-                                    app_state.documents.with(|documents| {
-                                        let document_kind = documents.get(document_key).unwrap();
-                                        match document_kind {
-                                            DocumentKind::TextDocument(_) => {
-                                                label(|| "Text document").into_any()
-                                            },
-                                            DocumentKind::ImageDocument(_) => {
-                                                label(|| "Image document").into_any()
-                                            },
-                                        }
-                                    })
-                                }).into_any()
+                                DocumentContainer::build_view(document_tab.document_key).into_any()
                             }
                         }
-                    })
+                    });
+
+                    view
                 } else {
                     empty().into_any()
                 }
             }
-        ),
-
+        )
+            .style(|s|s
+                .width_full()
+                .height_full()
+                .background(Color::DIM_GRAY)
+            ),
     ))
         .style(|s| s
             .width_full()
@@ -156,7 +148,6 @@ fn app_view() -> impl IntoView {
             .background(Color::LIGHT_GRAY)
         )
 }
-
 
 fn add_home_pressed(_event: &Event) {
     println!("Add home pressed");
