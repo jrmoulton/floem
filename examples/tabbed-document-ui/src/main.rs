@@ -7,7 +7,7 @@ use slotmap::{DefaultKey, SlotMap};
 use floem::IntoView;
 use floem::peniko::Color;
 use floem::reactive::{create_rw_signal, provide_context, RwSignal, SignalGet, SignalUpdate, use_context};
-use floem::views::{button, Decorators, dyn_container, dyn_stack, dyn_view, empty, h_stack, label, v_stack};
+use floem::views::{button, ButtonClass, Decorators, dyn_container, dyn_stack, dyn_view, empty, h_stack, label, v_stack};
 use crate::config::Config;
 use crate::documents::image::ImageDocument;
 use crate::documents::text::TextDocument;
@@ -104,14 +104,27 @@ fn app_view() -> impl IntoView {
 
                 app_state.unwrap().tabs.get()
             },
-            move |(tab_id, _tab_kind)| tab_id.clone(),
-            move |(_tab_id, tab_kind)| {
+            move |(tab_key, _tab_kind)| tab_key.clone(),
+            move |(tab_key, tab_kind)| {
+                println!("adding tab. tab_id: {:?}", tab_key);
+
                 match tab_kind {
                     TabKind::Home(_home_tab) => {
-                        label(||"Home")
+                        button(||"Home")
+                            .on_click_stop(move |_event|{
+                                println!("Home tab pressed");
+                                let app_state: Option<Arc<ApplicationState>> = use_context();
+                                app_state.unwrap().active_tab.set(Some(tab_key))
+                            }).into_any()
+
                     }
                     TabKind::Document(_document_tab) => {
-                        label(||"Document")
+                        button(||"Document")
+                            .on_click_stop(move |_event|{
+                                println!("Document tab pressed");
+                                let app_state: Option<Arc<ApplicationState>> = use_context();
+                                app_state.unwrap().active_tab.set(Some(tab_key))
+                            }).into_any()
                     }
                 }
             }
@@ -127,12 +140,17 @@ fn app_view() -> impl IntoView {
             move |active_tab| {
                 let app_state: Option<Arc<ApplicationState>> = use_context();
                 if let Some(tab_key) = active_tab {
+                    println!("displaying tab. tab_id: {:?}", &tab_key);
+
                     let tabs = app_state.unwrap().tabs.get();
                     let tab = tabs.get(tab_key).unwrap();
 
                     match tab {
                         TabKind::Home(_) => {
-                            label(|| "Home Tab Content").into_any()
+                            v_stack((
+                                label(|| "Home Tab Content"),
+                                dyn_view(move ||format!("tab_id: {:?}", &tab_key))
+                            )).into_any()
                         }
                         TabKind::Document(_) => {
                             label(|| "Document Tab Content").into_any()
