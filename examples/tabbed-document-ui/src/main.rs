@@ -1,10 +1,14 @@
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
 use std::sync::Arc;
 use slotmap::{DefaultKey, SlotMap};
 use floem::IntoView;
 use floem::peniko::Color;
 use floem::reactive::{create_rw_signal, provide_context, RwSignal, SignalGet, SignalUpdate, use_context};
 use floem::views::{button, Decorators, dyn_stack, h_stack, label, v_stack};
+use crate::config::Config;
 use crate::documents::image::ImageDocument;
 use crate::documents::text::TextDocument;
 
@@ -55,7 +59,7 @@ struct ApplicationState {
 
     tabs: RwSignal<SlotMap<DefaultKey, TabKind>>,
 
-    show_home_on_startup: bool,
+    config: Config,
 }
 
 fn app_view() -> impl IntoView {
@@ -111,15 +115,48 @@ fn app_view() -> impl IntoView {
         )
 }
 
+pub mod config {
+
+    #[derive(Default, serde::Serialize, serde::Deserialize)]
+    pub struct Config {
+        pub show_home_on_startup: bool,
+    }
+}
+
 fn main() {
+
+    let file = File::open(PathBuf::from("config.json"));
+    let config: Config = match file {
+        Ok(file) => {
+            serde_json::from_reader(file).unwrap()
+        }
+        Err(_) => {
+            Config::default()
+        }
+    };
 
     let app_state = ApplicationState {
         documents: Default::default(),
         tabs: create_rw_signal(Default::default()),
-        show_home_on_startup: false,
+        config,
     };
 
-    provide_context(Arc::new(app_state));
+    if app_state.config.show_home_on_startup {
+        app_state.tabs.update(|tabs|{
+            tabs.insert(
+                TabKind::Home(HomeTab {})
+            );
+        })
+    }
+
+    let app_state_arc = Arc::new(app_state);
+
+    provide_context(app_state_arc.clone());
 
     floem::launch(app_view);
+
+    let content: String = serde_json::to_string(&app_state_arc.config).unwrap();
+
+    let mut file = File::create(PathBuf::from("config.json")).unwrap();
+    file.write(content.as_bytes()).unwrap();
 }
