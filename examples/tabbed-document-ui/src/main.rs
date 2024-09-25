@@ -1,6 +1,3 @@
-use std::fs::File;
-use std::io::Write;
-use std::path::PathBuf;
 use std::sync::Arc;
 use slotmap::{DefaultKey, SlotMap};
 use floem::action::open_file;
@@ -11,153 +8,45 @@ use floem::peniko::Color;
 use floem::reactive::{create_rw_signal, provide_context, RwSignal, SignalGet, SignalUpdate, SignalWith, use_context};
 use floem::views::{button, Decorators, dyn_container, dyn_stack, dyn_view, empty, h_stack, label, v_stack};
 use crate::config::Config;
+use crate::documents::DocumentKind;
 use crate::documents::image::ImageDocument;
 use crate::documents::text::TextDocument;
+use crate::tabs::document::DocumentTab;
+use crate::tabs::home::HomeTab;
+use crate::tabs::TabKind;
 
-pub mod documents {
-    pub mod text {
-        use std::fs;
-        use std::path::PathBuf;
+pub mod config;
+pub mod documents;
+pub mod tabs;
 
-        pub struct TextDocument {
-            path: PathBuf,
-            content: String,
-            selection: (usize, usize),
-        }
+fn main() {
+    let config = config::load();
 
-        impl TextDocument {
-            pub fn new(path: PathBuf) -> Self {
+    let app_state = ApplicationState {
+        documents: create_rw_signal(Default::default()),
+        tabs: create_rw_signal(Default::default()),
+        active_tab: create_rw_signal(None),
+        config,
+    };
 
-                let content = fs::read_to_string(&path).unwrap();
-
-                Self {
-                    path,
-                    content,
-                    selection: (0, 0),
-                }
-            }
-        }
+    if app_state.config.show_home_on_startup {
+        show_home_tab(&app_state);
     }
 
-    pub mod image {
-        use std::path::PathBuf;
+    let app_state_arc = Arc::new(app_state);
 
-        pub struct ImageDocument {
-            path: PathBuf,
-            // TODO content: ImageContent(...)
-            coordinate: Option<(usize, usize)>
-        }
+    provide_context(app_state_arc.clone());
 
-        impl ImageDocument {
-            pub fn new(path: PathBuf) -> Self {
-                Self {
-                    path,
-                    coordinate: None,
-                }
-            }
-        }
-    }
-}
+    floem::launch(app_view);
 
-enum DocumentKind {
-    TextDocument(TextDocument),
-    ImageDocument(ImageDocument),
-}
-
-#[derive(Clone)]
-struct HomeTab {
-}
-
-#[derive(Clone)]
-struct DocumentTab {
-    document_key: DefaultKey,
-}
-
-#[derive(Clone)]
-enum TabKind {
-    Home(HomeTab),
-    Document(DocumentTab),
+    config::save(&app_state_arc.config);
 }
 
 struct ApplicationState {
     documents: RwSignal<SlotMap<DefaultKey, DocumentKind>>,
-
     tabs: RwSignal<SlotMap<DefaultKey, TabKind>>,
-
     active_tab: RwSignal<Option<DefaultKey>>,
-
     config: Config,
-}
-
-fn add_home_pressed(_event: &Event) {
-    println!("Add home pressed");
-
-    let app_state: Arc<ApplicationState> = use_context().unwrap();
-
-    app_state.tabs.update(|tabs|{
-        tabs.insert(
-            TabKind::Home(HomeTab {})
-        );
-    });
-}
-
-fn new_pressed(_event: &Event) {
-    println!("New pressed");
-}
-
-fn open_pressed(_event: &Event) {
-    println!("Open pressed");
-
-    open_file(
-        FileDialogOptions::new()
-            .title("Select a file")
-            .allowed_types(vec![
-                FileSpec {
-                    name: "text",
-                    extensions: &["txt"],
-                },
-                FileSpec {
-                    name: "image",
-                    extensions: &["bmp"],
-                }
-            ]),
-        move |file_info| {
-            if let Some(file) = file_info {
-                println!("Selected file: {:?}", file.path);
-
-
-                let app_state: Arc<ApplicationState> = use_context().unwrap();
-
-                let path = file.path.first().unwrap();
-
-                let document = match path.extension().unwrap().to_str().unwrap() {
-                    "txt" => {
-                        let text_document = TextDocument::new(path.clone());
-
-                        DocumentKind::TextDocument(text_document)
-                    },
-                    "bmp" => {
-                        let image_document = ImageDocument::new(path.clone());
-
-                        DocumentKind::ImageDocument(image_document)
-                    },
-                    _ => unreachable!()
-                };
-
-                let document_key= app_state.documents.try_update(|documents|{
-                    documents.insert(document)
-                }).unwrap();
-
-                app_state.tabs.update(|tabs|{
-                    let tab_key = tabs.insert(
-                        TabKind::Document(DocumentTab { document_key })
-                    );
-
-                    app_state.active_tab.set(Some(tab_key));
-                });
-            }
-        },
-    );
 }
 
 fn app_view() -> impl IntoView {
@@ -268,51 +157,84 @@ fn app_view() -> impl IntoView {
         )
 }
 
-pub mod config {
 
-    #[derive(Default, serde::Serialize, serde::Deserialize)]
-    pub struct Config {
-        pub show_home_on_startup: bool,
-    }
+fn add_home_pressed(_event: &Event) {
+    println!("Add home pressed");
+
+    let app_state: Arc<ApplicationState> = use_context().unwrap();
+
+    app_state.tabs.update(|tabs|{
+        tabs.insert(
+            TabKind::Home(HomeTab {})
+        );
+    });
 }
 
-fn main() {
+fn new_pressed(_event: &Event) {
+    println!("New pressed");
+}
 
-    let file = File::open(PathBuf::from("config.json"));
-    let config: Config = match file {
-        Ok(file) => {
-            serde_json::from_reader(file).unwrap()
-        }
-        Err(_) => {
-            Config::default()
-        }
-    };
+fn open_pressed(_event: &Event) {
+    println!("Open pressed");
 
-    let app_state = ApplicationState {
-        documents: create_rw_signal(Default::default()),
-        tabs: create_rw_signal(Default::default()),
-        active_tab: create_rw_signal(None),
-        config,
-    };
+    open_file(
+        FileDialogOptions::new()
+            .title("Select a file")
+            .allowed_types(vec![
+                FileSpec {
+                    name: "text",
+                    extensions: &["txt"],
+                },
+                FileSpec {
+                    name: "image",
+                    extensions: &["bmp"],
+                }
+            ]),
+        move |file_info| {
+            if let Some(file) = file_info {
+                println!("Selected file: {:?}", file.path);
 
-    if app_state.config.show_home_on_startup {
-        app_state.tabs.update(|tabs|{
-            let tab_key = tabs.insert(
-                TabKind::Home(HomeTab {})
-            );
 
-            app_state.active_tab.set(Some(tab_key));
-        })
-    }
+                let app_state: Arc<ApplicationState> = use_context().unwrap();
 
-    let app_state_arc = Arc::new(app_state);
+                let path = file.path.first().unwrap();
 
-    provide_context(app_state_arc.clone());
+                let document = match path.extension().unwrap().to_str().unwrap() {
+                    "txt" => {
+                        let text_document = TextDocument::new(path.clone());
 
-    floem::launch(app_view);
+                        DocumentKind::TextDocument(text_document)
+                    },
+                    "bmp" => {
+                        let image_document = ImageDocument::new(path.clone());
 
-    let content: String = serde_json::to_string(&app_state_arc.config).unwrap();
+                        DocumentKind::ImageDocument(image_document)
+                    },
+                    _ => unreachable!()
+                };
 
-    let mut file = File::create(PathBuf::from("config.json")).unwrap();
-    file.write(content.as_bytes()).unwrap();
+                let document_key= app_state.documents.try_update(|documents|{
+                    documents.insert(document)
+                }).unwrap();
+
+                app_state.tabs.update(|tabs|{
+                    let tab_key = tabs.insert(
+                        TabKind::Document(DocumentTab { document_key })
+                    );
+
+                    app_state.active_tab.set(Some(tab_key));
+                });
+            }
+        },
+    );
+}
+
+fn show_home_tab(app_state: &ApplicationState) {
+    app_state.tabs.update(|tabs| {
+        let tab_key = tabs.insert(
+            TabKind::Home(HomeTab {})
+        );
+
+        app_state.active_tab.set(Some(tab_key));
+    })
 }
