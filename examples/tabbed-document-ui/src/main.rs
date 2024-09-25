@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -10,7 +9,7 @@ use floem::file::{FileDialogOptions, FileSpec};
 use floem::IntoView;
 use floem::peniko::Color;
 use floem::reactive::{create_rw_signal, provide_context, RwSignal, SignalGet, SignalUpdate, SignalWith, use_context};
-use floem::views::{button, ButtonClass, Decorators, dyn_container, dyn_stack, dyn_view, empty, h_stack, label, v_stack};
+use floem::views::{button, Decorators, dyn_container, dyn_stack, dyn_view, empty, h_stack, label, v_stack};
 use crate::config::Config;
 use crate::documents::image::ImageDocument;
 use crate::documents::text::TextDocument;
@@ -47,6 +46,15 @@ pub mod documents {
             path: PathBuf,
             // TODO content: ImageContent(...)
             coordinate: Option<(usize, usize)>
+        }
+
+        impl ImageDocument {
+            pub fn new(path: PathBuf) -> Self {
+                Self {
+                    path,
+                    coordinate: None,
+                }
+            }
         }
     }
 }
@@ -122,10 +130,21 @@ fn open_pressed(_event: &Event) {
 
                 let path = file.path.first().unwrap();
 
-                let text_document = TextDocument::new(path.clone());
+                let document = match path.extension().unwrap().to_str().unwrap() {
+                    "txt" => {
+                        let text_document = TextDocument::new(path.clone());
 
-                let document = DocumentKind::TextDocument(text_document);
-                let document_key= app_state.documents.try_update(|mut documents|{
+                        DocumentKind::TextDocument(text_document)
+                    },
+                    "bmp" => {
+                        let image_document = ImageDocument::new(path.clone());
+
+                        DocumentKind::ImageDocument(image_document)
+                    },
+                    _ => unreachable!()
+                };
+
+                let document_key= app_state.documents.try_update(|documents|{
                     documents.insert(document)
                 }).unwrap();
 
@@ -200,24 +219,41 @@ fn app_view() -> impl IntoView {
                 app_state.unwrap().active_tab.get()
             },
             move |active_tab| {
-                let app_state: Option<Arc<ApplicationState>> = use_context();
+                let app_state: Arc<ApplicationState> = use_context().unwrap();
                 if let Some(tab_key) = active_tab {
                     println!("displaying tab. tab_id: {:?}", &tab_key);
 
-                    let tabs = app_state.unwrap().tabs.get();
-                    let tab = tabs.get(tab_key).unwrap();
+                    let tabs_signal = app_state.tabs;
+                    tabs_signal.with_untracked(|tabs|{
+                        let tab = tabs.get(tab_key).unwrap().clone();
 
-                    match tab {
-                        TabKind::Home(_) => {
-                            v_stack((
-                                label(|| "Home Tab Content"),
-                                dyn_view(move ||format!("tab_id: {:?}", &tab_key))
-                            )).into_any()
+                        match tab {
+                            TabKind::Home(_) => {
+                                v_stack((
+                                    label(|| "Home Tab Content"),
+                                    dyn_view(move ||format!("tab_id: {:?}", &tab_key))
+                                )).into_any()
+                            }
+                            TabKind::Document(document_tab) => {
+                                dyn_container(move ||{
+                                    document_tab.document_key
+                                },
+                                move |document_key|{
+                                    app_state.documents.with(|documents| {
+                                        let document_kind = documents.get(document_key).unwrap();
+                                        match document_kind {
+                                            DocumentKind::TextDocument(_) => {
+                                                label(|| "Text document").into_any()
+                                            },
+                                            DocumentKind::ImageDocument(_) => {
+                                                label(|| "Image document").into_any()
+                                            },
+                                        }
+                                    })
+                                }).into_any()
+                            }
                         }
-                        TabKind::Document(_) => {
-                            label(|| "Document Tab Content").into_any()
-                        }
-                    }
+                    })
                 } else {
                     empty().into_any()
                 }
