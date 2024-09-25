@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 im.workspace = true
-floem = { path = "../.." }
+floem = { path = "../..", features = ["rfd-tokio"] }
 
 slotmap = { version = "1.0.7" }
 
