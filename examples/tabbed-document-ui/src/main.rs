@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use slotmap::{DefaultKey, SlotMap};
 use floem::IntoView;
 use floem::peniko::Color;
 use floem::reactive::{create_rw_signal, provide_context, RwSignal, SignalGet, SignalUpdate, use_context};
@@ -49,13 +50,10 @@ enum TabKind {
     Document(DocumentTab),
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct TabId(String);
-
 struct ApplicationState {
     documents: HashMap<String, DocumentKind>,
 
-    tabs: RwSignal<HashMap<TabId, TabKind>>,
+    tabs: RwSignal<SlotMap<DefaultKey, TabKind>>,
 
     show_home_on_startup: bool,
 }
@@ -64,19 +62,22 @@ fn app_view() -> impl IntoView {
 
     v_stack((
         h_stack((
-            button(||"New").on_click_stop(move |_event|{
+            button(||"Add home").on_click_stop(move |_event|{
 
-                println!("New pressed");
+                println!("Add home pressed");
 
                 let app_state: Arc<ApplicationState> = use_context().unwrap();
 
                 app_state.tabs.update(|tabs|{
                     tabs.insert(
-                        TabId("home-tab-id".to_string()),
                         TabKind::Home(HomeTab {})
                     );
                 });
 
+            }),
+            button(||"New").on_click_stop(move |_event|{
+
+                println!("New pressed");
             }),
             button(||"Open"),
         ))
