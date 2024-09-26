@@ -1,13 +1,13 @@
-use std::path::PathBuf;
 use floem::peniko::Color;
 use floem::style::TextOverflow;
+use floem::views::{empty, label, v_stack, Decorators, TupleStackExt};
 use floem::View;
-use floem::views::{Decorators, empty, h_stack, label, static_label, v_stack};
+use std::path::PathBuf;
 
 pub struct ImageDocument {
     path: PathBuf,
     // TODO content: ImageContent(...)
-    coordinate: Option<(usize, usize)>
+    coordinate: Option<(usize, usize)>,
 }
 
 impl ImageDocument {
@@ -19,54 +19,36 @@ impl ImageDocument {
     }
 
     pub fn build_view(&self) -> impl View {
-        h_stack((
-            //
-            // info panel
-            //
-            v_stack((
-                {
-                    h_stack((
-                        static_label("path"),
-                        static_label(self.path.to_str().unwrap())
-                            .style(|s|s
-                                // FIXME doesn't make any difference, path appears truncated
-                                .text_overflow(TextOverflow::Wrap)
-                            )
-                    ))
-                },
-                {
-                    h_stack((
-                        static_label("coordinate"),
-                        {
-                            // FIXME this needs to be reactive
-                            let coordinate_label = format!("{:?}", self.coordinate);
-                            label(move || coordinate_label.clone())
-                        }
-                    ))
-                }
-            ))
-                .style(|s|s
-                    .height_full()
-                    .width_pct(20.0)
-                ),
+        // FIXME doesn't make any difference, path appears truncated
+        // same as in text file
+        let path = self
+            .path
+            .to_str()
+            .unwrap()
+            .to_owned()
+            .style(|s| s.text_overflow(TextOverflow::Wrap));
 
-            //
-            // content
-            //
-            {
-                // TODO show the image
-                empty()
-            }
-                .style(|s|s
-                    .height_full()
-                    // FIXME if this is 80% or 'full' it still doesn't take up the remaining space.
-                    .width_full()
-                    .background(Color::DARK_GRAY)
-                ),
+        let coordinates = {
+            // FIXME this needs to be reactive
+            let coordinate_label = format!("{:?}", self.coordinate);
+            label(move || coordinate_label.clone())
+        };
+
+        let info_panel = v_stack((
+            ("path", path).h_stack(),
+            ("coordinate", coordinates).h_stack(),
         ))
-            .style(|s|s
+        .style(|s| s.height_full().width_pct(20.0));
+
+        let content = empty().style(|s| {
+            s.height_full()
+                // FIXME if this is 80% or 'full' it still doesn't take up the remaining space.
                 .width_full()
-                .height_full()
-            )
+                .background(Color::DARK_GRAY)
+        });
+
+        (info_panel, content)
+            .h_stack()
+            .style(|s| s.width_full().height_full())
     }
 }
