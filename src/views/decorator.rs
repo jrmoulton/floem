@@ -7,7 +7,7 @@ use floem_winit::keyboard::Key;
 use peniko::kurbo::{Point, Rect};
 
 use crate::{
-    action::{set_window_menu, set_window_title, update_window_scale},
+    action::{set_window_menu, set_window_scale, set_window_title},
     animate::Animation,
     event::{Event, EventListener, EventPropagation},
     keyboard::Modifiers,
