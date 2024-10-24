@@ -166,11 +166,31 @@ pub trait Decorators: IntoView<V = Self::DV> + Sized {
         self,
         key: Key,
         modifiers: Modifiers,
-        action: impl Fn(&Event) + 'static,
+        mut action: impl FnMut(&Event) + 'static,
     ) -> Self::DV {
         self.on_event(EventListener::KeyDown, move |e| {
             if let Event::KeyDown(ke) = e {
                 if ke.key.logical_key == key && ke.modifiers == modifiers {
+                    action(e);
+                    return EventPropagation::Stop;
+                }
+            }
+            EventPropagation::Continue
+        })
+    }
+
+    /// Add an handler for pressing down a specific key.
+    ///
+    /// NOTE: View should have `.keyboard_navigable()` in order to receive keyboard events
+    fn on_key_down_cmp(
+        self,
+        key: Key,
+        cmp: impl Fn(Modifiers) -> bool + 'static,
+        action: impl Fn(&Event) + 'static,
+    ) -> Self::DV {
+        self.on_event(EventListener::KeyDown, move |e| {
+            if let Event::KeyDown(ke) = e {
+                if ke.key.logical_key == key && cmp(ke.modifiers) {
                     action(e);
                     return EventPropagation::Stop;
                 }
