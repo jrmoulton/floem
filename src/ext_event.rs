@@ -17,6 +17,9 @@ use crossbeam::channel::Receiver;
 #[cfg(not(feature = "crossbeam"))]
 use std::sync::mpsc::Receiver;
 
+mod channel_signal;
+pub use channel_signal::ChannelSignal;
+
 /// # SAFETY
 ///
 /// **DO NOT USE THIS** trigger except for when using with `create_ext_action` or when you guarantee that
@@ -161,83 +164,6 @@ pub fn update_signal_from_channel<T: Send + 'static>(
         }
         send(());
     });
-}
-
-pub fn create_signal_from_channel<T: Send + 'static>(rx: Receiver<T>) -> ReadSignal<Option<T>> {
-    let cx = Scope::new();
-    let trigger = with_scope(cx, ExtSendTrigger::new);
-
-    let channel_closed = cx.create_rw_signal(false);
-    let (read, write) = cx.create_signal(None);
-    let data = Arc::new(Mutex::new(VecDeque::new()));
-
-    {
-        let data = data.clone();
-        cx.create_effect(move |_| {
-            trigger.track();
-            while let Some(value) = data.lock().pop_front() {
-                write.set(value);
-            }
-
-            if channel_closed.get() {
-                cx.dispose();
-            }
-        });
-    }
-
-    let send = create_ext_action(cx, move |_| {
-        channel_closed.set(true);
-    });
-
-    std::thread::spawn(move || {
-        while let Ok(event) = rx.recv() {
-            data.lock().push_back(Some(event));
-            EXT_EVENT_HANDLER.add_trigger(trigger);
-        }
-        send(());
-    });
-
-    read
-}
-
-#[cfg(feature = "tokio")]
-pub fn create_signal_from_tokio_channel<T: Send + 'static>(
-    mut rx: tokio::sync::mpsc::UnboundedReceiver<T>,
-) -> ReadSignal<Option<T>> {
-    let cx = Scope::new();
-    let trigger = with_scope(cx, ExtSendTrigger::new);
-
-    let channel_closed = cx.create_rw_signal(false);
-    let (read, write) = cx.create_signal(None);
-    let data = std::sync::Arc::new(std::sync::Mutex::new(VecDeque::new()));
-
-    {
-        let data = data.clone();
-        cx.create_effect(move |_| {
-            trigger.track();
-            while let Some(value) = data.lock().unwrap().pop_front() {
-                write.set(value);
-            }
-
-            if channel_closed.get() {
-                cx.dispose();
-            }
-        });
-    }
-
-    let send = create_ext_action(cx, move |_| {
-        channel_closed.set(true);
-    });
-
-    tokio::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            data.lock().unwrap().push_back(Some(event));
-            crate::ext_event::register_ext_trigger(trigger);
-        }
-        send(());
-    });
-
-    read
 }
 
 #[cfg(feature = "futures")]
