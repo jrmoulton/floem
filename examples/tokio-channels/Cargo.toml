@@ -1,0 +1,10 @@
+[package]
+name = "tokio-channels"
+edition = "2021"
+license.workspace = true
+version.workspace = true
+
+
+[dependencies]
+floem = { path = "../..", features = ["tokio"] }
+tokio = { version = "1", features = ["time", "sync", "rt-multi-thread"] }
