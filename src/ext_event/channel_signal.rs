@@ -203,7 +203,7 @@ impl<T: Send + 'static> From<crossbeam::channel::Receiver<T>> for ChannelSignal<
         let trigger = with_scope(cx, ExtSendTrigger::new);
         let channel_closed = cx.create_rw_signal(false);
         let (read, write) = cx.create_signal(None);
-        let data = Arc::new(Mutex::new(VecDeque::new()));
+        let data = Arc::new(parking_lot::Mutex::new(VecDeque::new()));
         {
             let data = data.clone();
             cx.create_effect(move |_| {
