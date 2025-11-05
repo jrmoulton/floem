@@ -45,7 +45,8 @@ wgpu = { version = "26.0" }
 parking_lot = { version = "0.12" }
 swash = { version = "0.2" }
 muda = { version = "0.17.1", default-features = false }
-winit = { git = "https://github.com/lapce/winit", rev = "262a8c661e4e1e782410a5903564e0a66c3c095e", package = "floem-winit" }
+# winit = { git = "https://github.com/lapce/winit", rev = "262a8c661e4e1e782410a5903564e0a66c3c095e", package = "floem-winit" }
+winit = {path = "../winit/winit"}
 ui-events = {version = "0.2", features = ["kurbo"]}
 ui-events-winit = {path = "./ui-events-winit", package = "ui-events-floem-winit"}
 dpi = { version = "0.1.2", default-features = false }
