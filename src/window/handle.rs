@@ -386,7 +386,8 @@ impl WindowHandle {
             }
         }
 
-        self.process_update();
+        self.window.request_redraw();
+        // self.process_update();
     }
 
     pub(crate) fn scale(&mut self, scale: f64) {
