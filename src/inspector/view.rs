@@ -197,7 +197,7 @@ fn capture_view(
     let renderer = capture_.renderer.clone();
 
     let image = if let Some(window) = window {
-        img_dynamic(move || window.clone()).into_any()
+        img_dynamic(move || peniko::ImageBrush::new(window.clone())).into_any()
     } else {
         ().style(move |s| s.min_width(size.width).min_height(size.height))
             .into_any()
